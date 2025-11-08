@@ -47,7 +47,7 @@ static int cmdline_read_common(enum cmdline_parse_type type, const char* input, 
             max_tokens = MAX_ENVS_CNT;
             break;
         default:
-            return -PAL_ERROR_INVAL;
+            return PAL_ERROR_INVAL;
     }
 
     int ret;
@@ -56,17 +56,17 @@ static int cmdline_read_common(enum cmdline_parse_type type, const char* input, 
 
     char* input_copy = strdup(input);
     if (!input_copy)
-        return -PAL_ERROR_NOMEM;
+        return PAL_ERROR_NOMEM;
 
     p = strstr(input_copy, begin_str);
     if (!p) {
-        ret = -PAL_ERROR_INVAL;
+        ret = PAL_ERROR_INVAL;
         goto out;
     }
 
     char* p_end = strstr(p, end_str);
     if (!p_end) {
-        ret = -PAL_ERROR_INVAL;
+        ret = PAL_ERROR_INVAL;
         goto out;
     }
 
@@ -81,7 +81,7 @@ static int cmdline_read_common(enum cmdline_parse_type type, const char* input, 
             break;
 
         if (curr_cnt == max_tokens) {
-            ret = -PAL_ERROR_NOMEM;
+            ret = PAL_ERROR_NOMEM;
             goto out;
         }
 
@@ -98,7 +98,7 @@ static int cmdline_read_common(enum cmdline_parse_type type, const char* input, 
             while (*p != '\0' && *p != '"')
                 p++;
             if (*p == '\0') {
-                ret = -PAL_ERROR_INVAL;
+                ret = PAL_ERROR_INVAL;
                 goto out;
             }
             *p++ = '\0'; /* replace closing double-quote with NUL */
@@ -143,7 +143,7 @@ static int find_fw_cfg_selector(const char* fw_cfg_name, uint16_t* out_selector,
     /* QEMU provides in big-endian, but our x86-64 CPU is little-endian */
     fw_cfg_files_count = __builtin_bswap32(fw_cfg_files_count);
     if (fw_cfg_files_count > MAX_FW_CFG_FILES)
-        return -PAL_ERROR_INVAL;
+        return PAL_ERROR_INVAL;
 
     uint16_t fw_cfg_selector = 0;
     uint32_t fw_cfg_size = 0;
@@ -155,7 +155,7 @@ static int find_fw_cfg_selector(const char* fw_cfg_name, uint16_t* out_selector,
 
         if (strlen(fw_cfg_name) + 1 > sizeof(fw_cfg_file.name)) {
             /* make sure the searched-for string is less than the fw_cfg file name limit (56) */
-            return -PAL_ERROR_INVAL;
+            return PAL_ERROR_INVAL;
         }
 
         if (strcmp(fw_cfg_file.name, fw_cfg_name) == 0) {
@@ -166,7 +166,7 @@ static int find_fw_cfg_selector(const char* fw_cfg_name, uint16_t* out_selector,
     }
 
     if (!fw_cfg_selector || !fw_cfg_size)
-        return -PAL_ERROR_INVAL;
+        return PAL_ERROR_INVAL;
 
     *out_selector = __builtin_bswap16(fw_cfg_selector);
     *out_size = __builtin_bswap32(fw_cfg_size);
@@ -183,7 +183,7 @@ int cmdline_init_args(char* cmdline_args, size_t cmdline_args_size) {
         return ret;
 
     if (fw_cfg_size >= cmdline_args_size)
-        return -PAL_ERROR_INVAL;
+        return PAL_ERROR_INVAL;
 
     vm_portio_writew(FW_CFG_PORT_SEL, fw_cfg_selector);
     for (size_t i = 0; i < fw_cfg_size; i++)
@@ -191,7 +191,7 @@ int cmdline_init_args(char* cmdline_args, size_t cmdline_args_size) {
 
     uint32_t cmdline_args_len = strlen(cmdline_args);
     if (cmdline_args_len == 0 || cmdline_args_len >= MAX_ARGV_SIZE)
-        return -PAL_ERROR_INVAL;
+        return PAL_ERROR_INVAL;
 
     /* note that cmdline is guaranteed to be NULL terminated and have at least one symbol */
     return 0;
@@ -207,7 +207,7 @@ int cmdline_init_envs(char* cmdline_envs, size_t cmdline_envs_size) {
         return ret;
 
     if (fw_cfg_size >= cmdline_envs_size)
-        return -PAL_ERROR_INVAL;
+        return PAL_ERROR_INVAL;
 
     vm_portio_writew(FW_CFG_PORT_SEL, fw_cfg_selector);
     for (size_t i = 0; i < fw_cfg_size; i++)
@@ -215,7 +215,7 @@ int cmdline_init_envs(char* cmdline_envs, size_t cmdline_envs_size) {
 
     uint32_t cmdline_envs_len = strlen(cmdline_envs);
     if (cmdline_envs_len == 0 || cmdline_envs_len >= MAX_ENVS_SIZE)
-        return -PAL_ERROR_INVAL;
+        return PAL_ERROR_INVAL;
 
     /* note that envs is guaranteed to be NULL terminated and have at least one symbol */
     return 0;
@@ -229,7 +229,7 @@ int host_pwd_init(void) {
         return ret;
 
     if (fw_cfg_size >= sizeof(g_host_pwd))
-        return -PAL_ERROR_INVAL;
+        return PAL_ERROR_INVAL;
 
     vm_portio_writew(FW_CFG_PORT_SEL, fw_cfg_selector);
     for (size_t i = 0; i < fw_cfg_size; i++)
@@ -237,7 +237,7 @@ int host_pwd_init(void) {
 
     uint32_t len = strlen(g_host_pwd);
     if (len == 0)
-        return -PAL_ERROR_INVAL;
+        return PAL_ERROR_INVAL;
 
     /* note that host PWD is guaranteed to be NULL terminated and have at least one symbol */
     return 0;
@@ -253,7 +253,7 @@ int unixtime_init(char* unixtime_s, size_t unixtime_size) {
         return ret;
 
     if (fw_cfg_size >= unixtime_size)
-        return -PAL_ERROR_INVAL;
+        return PAL_ERROR_INVAL;
 
     vm_portio_writew(FW_CFG_PORT_SEL, fw_cfg_selector);
     for (size_t i = 0; i < fw_cfg_size; i++)
@@ -261,7 +261,7 @@ int unixtime_init(char* unixtime_s, size_t unixtime_size) {
 
     uint32_t len = strlen(unixtime_s);
     if (len == 0 || len >= TIME_S_STR_MAX)
-        return -PAL_ERROR_INVAL;
+        return PAL_ERROR_INVAL;
 
     /* note that `unixtime_s` is guaranteed to be NULL terminated and have at least one symbol */
     return 0;
@@ -278,7 +278,7 @@ int e820_table_init(char* e820_table, size_t* e820_size, size_t max_e820_size) {
         return ret;
 
     if (fw_cfg_size > max_e820_size)
-        return -PAL_ERROR_INVAL;
+        return PAL_ERROR_INVAL;
 
     vm_portio_writew(FW_CFG_PORT_SEL, fw_cfg_selector);
     for (size_t i = 0; i < fw_cfg_size; i++)

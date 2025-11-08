@@ -66,7 +66,7 @@ static int handle_rq(uint16_t host_used_idx, bool* out_received) {
     if (host_used_idx - g_console->rq->seen_used > g_console->rq->queue_size) {
         /* malicious (impossible) value reported by the host; note that this check works also in
          * cases of int wrap */
-        return -PAL_ERROR_DENIED;
+        return PAL_ERROR_DENIED;
     }
 
     while (host_used_idx != g_console->rq->seen_used) {
@@ -75,7 +75,7 @@ static int handle_rq(uint16_t host_used_idx, bool* out_received) {
 
         if (desc_idx >= g_console->rq->queue_size) {
             /* malicious (out of bounds) descriptor index */
-            return -PAL_ERROR_DENIED;
+            return PAL_ERROR_DENIED;
         }
 
         uint64_t addr = vm_shared_readq(&g_console->rq->desc[desc_idx].addr);
@@ -84,17 +84,17 @@ static int handle_rq(uint16_t host_used_idx, bool* out_received) {
         if (addr < (uintptr_t)g_console->shared_rq_buf ||
                 addr >= (uintptr_t)g_console->shared_rq_buf + VIRTIO_CONSOLE_SHARED_BUF_SIZE) {
             /* malicious (out of bounds) incoming message */
-            return -PAL_ERROR_DENIED;
+            return PAL_ERROR_DENIED;
         }
 
         if ((addr - (uintptr_t)g_console->shared_rq_buf) % VIRTIO_CONSOLE_ITEM_SIZE) {
             /* malicious (not aligned on max item size) offset of the incoming message */
-            return -PAL_ERROR_DENIED;
+            return PAL_ERROR_DENIED;
         }
 
         if (size > VIRTIO_CONSOLE_ITEM_SIZE) {
             /* malicious (out of bounds) size of the incoming message */
-            return -PAL_ERROR_DENIED;
+            return PAL_ERROR_DENIED;
         }
 
         if (g_console->rq_buf_pos + size > VIRTIO_CONSOLE_RQ_BUF_SIZE) {
@@ -175,7 +175,7 @@ int64_t virtio_console_read(char* buffer, size_t size) {
     size_t bytes_read;
 
     if (!g_console)
-        return -PAL_ERROR_BADHANDLE;
+        return PAL_ERROR_BADHANDLE;
 
     spinlock_lock(&g_console_receive_lock);
     if (g_console->rq_buf_pos == 0) {
@@ -185,13 +185,13 @@ int64_t virtio_console_read(char* buffer, size_t size) {
             ret = 0;
             goto out;
         }
-        ret = -PAL_ERROR_TRYAGAIN;
+        ret = PAL_ERROR_TRYAGAIN;
         goto out;
     }
 
     if (g_console->rq_buf[g_console->rq_buf_pos - 1] != '\n') {
         /* non-blocking caller must return TRYAGAIN; blocking caller must sleep on this */
-        ret = -PAL_ERROR_TRYAGAIN;
+        ret = PAL_ERROR_TRYAGAIN;
         goto out;
     }
 
@@ -218,7 +218,7 @@ static int cleanup_tq(void) {
     if (host_used_idx - g_console->tq->seen_used > g_console->tq->queue_size) {
         /* malicious (impossible) value reported by the host; note that this check works also in
          * cases of int wrap */
-        return -PAL_ERROR_DENIED;
+        return PAL_ERROR_DENIED;
     }
 
     while (host_used_idx != g_console->tq->seen_used) {
@@ -227,12 +227,12 @@ static int cleanup_tq(void) {
 
         if (desc_idx >= g_console->tq->queue_size) {
             /* malicious (out of bounds) descriptor index */
-            return -PAL_ERROR_DENIED;
+            return PAL_ERROR_DENIED;
         }
 
         if (virtq_is_desc_free(g_console->tq, desc_idx)) {
             /* malicious descriptor index (attempt at double-free attack) */
-            return -PAL_ERROR_DENIED;
+            return PAL_ERROR_DENIED;
         }
 
         virtq_free_desc(g_console->tq, desc_idx);
@@ -271,12 +271,12 @@ int virtio_console_nprint(const char* s, size_t size) {
     int ret;
 
     if (!g_console)
-        return -PAL_ERROR_BADHANDLE;
+        return PAL_ERROR_BADHANDLE;
 
     spinlock_lock(&g_console_transmit_lock);
     if (size > VIRTIO_CONSOLE_SHARED_BUF_SIZE) {
         /* message cannot fit into shared_tq_buf, cannot print it */
-        ret = -PAL_ERROR_NOMEM;
+        ret = PAL_ERROR_NOMEM;
         goto out;
     }
 
@@ -377,7 +377,7 @@ static int virtio_console_negotiate_features(struct virtio_console* console) {
     advertised_features = vm_mmio_readl(&pci_regs->device_feature);
 
     if (!(advertised_features & (1 << VIRTIO_F_VERSION_1)))
-        return -PAL_ERROR_DENIED;
+        return PAL_ERROR_DENIED;
 
     understood_features  = 1 << VIRTIO_F_VERSION_1;
 
@@ -399,12 +399,12 @@ static int virtio_console_alloc(struct virtio_console** out_console) {
 
     console = malloc(sizeof(*console));
     if (!console)
-        return -PAL_ERROR_NOMEM;
+        return PAL_ERROR_NOMEM;
     memset(console, 0, sizeof(*console)); /* for sanity */
 
     rq_buf = malloc(VIRTIO_CONSOLE_RQ_BUF_SIZE);
     if (!rq_buf) {
-        ret = -PAL_ERROR_NOMEM;
+        ret = PAL_ERROR_NOMEM;
         goto fail;
     }
     memset(rq_buf, 0, VIRTIO_CONSOLE_RQ_BUF_SIZE); /* for sanity */
@@ -412,7 +412,7 @@ static int virtio_console_alloc(struct virtio_console** out_console) {
     shared_rq_buf = memory_get_shared_region(VIRTIO_CONSOLE_SHARED_BUF_SIZE);
     shared_tq_buf = memory_get_shared_region(VIRTIO_CONSOLE_SHARED_BUF_SIZE);
     if (!shared_rq_buf || !shared_tq_buf) {
-        ret = -PAL_ERROR_NOMEM;
+        ret = PAL_ERROR_NOMEM;
         goto fail;
     }
 
@@ -513,7 +513,7 @@ int virtio_console_init(struct virtio_pci_regs* pci_regs, struct virtio_console_
     status = vm_mmio_readb(&pci_regs->device_status);
     if (!(status & VIRTIO_STATUS_FEATURES_OK)) {
         /* host device (vhost-console) did not accept our features */
-        ret = -PAL_ERROR_DENIED;
+        ret = PAL_ERROR_DENIED;
         goto fail;
     }
 
@@ -541,7 +541,7 @@ int virtio_console_init(struct virtio_pci_regs* pci_regs, struct virtio_console_
     if (!(PCI_MMIO_START_ADDR <= (uintptr_t)console->rq_notify_addr &&
                 (uintptr_t)console->rq_notify_addr + rq_notify_addr_size < PCI_MMIO_END_ADDR)) {
         /* incorrect or malicious RQ queue notify addr */
-        ret = -PAL_ERROR_DENIED;
+        ret = PAL_ERROR_DENIED;
         goto fail;
     }
 
@@ -553,7 +553,7 @@ int virtio_console_init(struct virtio_pci_regs* pci_regs, struct virtio_console_
     if (!(PCI_MMIO_START_ADDR <= (uintptr_t)console->tq_notify_addr &&
                 (uintptr_t)console->tq_notify_addr + tq_notify_addr_size < PCI_MMIO_END_ADDR)) {
         /* incorrect or malicious TQ queue notify addr */
-        ret = -PAL_ERROR_DENIED;
+        ret = PAL_ERROR_DENIED;
         goto fail;
     }
 

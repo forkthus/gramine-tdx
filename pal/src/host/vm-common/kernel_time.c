@@ -48,7 +48,7 @@ int get_time_in_us(uint64_t* out_us) {
 
     uint64_t us = g_start_us + diff_us;
     if (us < g_start_us)
-        return -PAL_ERROR_OVERFLOW;
+        return PAL_ERROR_OVERFLOW;
 
     *out_us = us;
     return 0;
@@ -69,11 +69,11 @@ int delay(uint64_t delay_us, bool* continue_gate) {
 
 int register_timeout(uint64_t timeout_absolute_us, int* futex, void** timeout_out) {
     if (!timeout_out)
-        return -PAL_ERROR_INVAL;
+        return PAL_ERROR_INVAL;
 
     struct pending_timeout* timeout = malloc(sizeof(*timeout));
     if (!timeout)
-        return -PAL_ERROR_NOMEM;
+        return PAL_ERROR_NOMEM;
 
     assert(futex);
     timeout->timeout_absolute_us = timeout_absolute_us;
@@ -150,7 +150,7 @@ int time_init(void) {
      * [1672531200, 1988150400), that is
      * [`TZ=UTC date -d "Jan 1 2023" +%s`, `TZ=UTC date -d "Jan 1 2033" +%s`) */
     if (start_s < 1672531200 || start_s >= 1988150400) {
-        return -PAL_ERROR_INVAL;
+        return PAL_ERROR_INVAL;
     }
 
     g_start_us = start_s * TIME_US_IN_S;

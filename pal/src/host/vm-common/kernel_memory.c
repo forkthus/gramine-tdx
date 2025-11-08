@@ -98,7 +98,7 @@ int memory_find_page_table_entry(uint64_t addr, uint64_t** out_pte_addr) {
     /* sanity check: must arrive at the same page address as in `addr` */
     uint64_t page_addr = pt_table[pt_table_idx] & page_table_entry_addr_mask;
     if ((addr & page_table_entry_addr_mask) != page_addr)
-        return -PAL_ERROR_INVAL;
+        return PAL_ERROR_INVAL;
 
     *out_pte_addr = &pt_table[pt_table_idx];
     return 0;
@@ -187,7 +187,7 @@ static int asan_init(void* memory_address_end, uint64_t page_tables_addr, size_t
     if (vm_address_space_size < 7UL * 1024 * 1024 * 1024) {
         /* FIXME: print error via Port I/O because normal log fails at this early boot stage */
         debug_serial_io_write("Failed to initialize Address Sanitizer: VM size is less than 8GB");
-        return -PAL_ERROR_NOMEM;
+        return PAL_ERROR_NOMEM;
     }
 
     uint64_t asan_shadow_phys_start = (uint64_t)memory_address_end - vm_address_space_size / 8;
@@ -218,7 +218,7 @@ static int asan_init(void* memory_address_end, uint64_t page_tables_addr, size_t
     size_t asan_tables_cnt = page_tables_cnt + page_dir_tables_cnt + /*PDP=*/1 + /*PML4=*/0;
     if ((normal_tables_cnt + asan_tables_cnt) * PAGE_SIZE > page_tables_size) {
         /* normal + asan page tables can occupy no more than page_tables_size, check for sanity */
-        return -PAL_ERROR_NOMEM;
+        return PAL_ERROR_NOMEM;
     }
 
     /* ASan memory is accessible only from kernel mode (ring 0), RW, present, non-executable */
@@ -319,7 +319,7 @@ static int pagetables_init(size_t memory_size, uint64_t page_tables_addr, size_t
     size_t total_tables_cnt = page_tables_cnt + page_dir_tables_cnt + /*PDP=*/1 + /*PML4=*/1;
     if (total_tables_cnt * PAGE_SIZE > page_tables_size) {
         /* page tables can occupy no more than page_tables_size, check for sanity */
-        return -PAL_ERROR_NOMEM;
+        return PAL_ERROR_NOMEM;
     }
 
     uint64_t ptr = page_tables_addr;
@@ -333,7 +333,7 @@ static int pagetables_init(size_t memory_size, uint64_t page_tables_addr, size_t
     }
 
     if (!IS_ALIGNED(ptr, PAGE_SIZE))
-        return -PAL_ERROR_INVAL;
+        return PAL_ERROR_INVAL;
 
     /* page directory tables with PDE entries */
     uint64_t page_dir_tables_base = ptr;
@@ -345,7 +345,7 @@ static int pagetables_init(size_t memory_size, uint64_t page_tables_addr, size_t
     }
 
     if (!IS_ALIGNED(ptr, PAGE_SIZE))
-        return -PAL_ERROR_INVAL;
+        return PAL_ERROR_INVAL;
 
     /* one PDP page with up to 512 PDPE entries */
     uint64_t pdp_table_base = ptr;
@@ -411,7 +411,7 @@ int memory_pagetables_init(void* memory_address_end, bool current_page_tables_co
     /* memory size must be at most 512GB in size, because the current construction of page tables
      * relies on a single PDP page which limits max addressable memory to 512GB */
     if (memory_size > 512UL * 1024 * 1024 * 1024)
-        return -PAL_ERROR_OVERFLOW;
+        return PAL_ERROR_OVERFLOW;
 
     size_t total_tables_cnt;
     uint64_t pml4_table_base;
@@ -446,18 +446,18 @@ int memory_preload_ranges(e820_table_entry* e820_entries, size_t e820_entries_si
         if (e820_entries[i].address < PAGE_TABLES_ADDR + PAGE_TABLES_SIZE &&
                 PAGE_TABLES_ADDR < e820_entries[i].address + e820_entries[i].size) {
             /* a reserved range overlaps with our page tables range */
-            return -PAL_ERROR_DENIED;
+            return PAL_ERROR_DENIED;
         }
 
         if (e820_entries[i].address < SHARED_MEM_ADDR + SHARED_MEM_SIZE &&
                 SHARED_MEM_ADDR < e820_entries[i].address + e820_entries[i].size) {
             /* a reserved range overlaps with our shared memory range */
-            return -PAL_ERROR_DENIED;
+            return PAL_ERROR_DENIED;
         }
 
         ret = callback(e820_entries[i].address, e820_entries[i].size, "E820 reserved");
         if (ret < 0)
-            return -PAL_ERROR_NOMEM;
+            return PAL_ERROR_NOMEM;
     }
 
     /*
@@ -485,22 +485,22 @@ int memory_preload_ranges(e820_table_entry* e820_entries, size_t e820_entries_si
      */
     ret = callback(0x1000UL, 0x100000UL - 0x1000UL, "dos_memory_addr");
     if (ret < 0)
-        return -PAL_ERROR_NOMEM;
+        return PAL_ERROR_NOMEM;
     ret = callback(PAGE_TABLES_ADDR, PAGE_TABLES_SIZE, "page_tables");
     if (ret < 0)
-        return -PAL_ERROR_NOMEM;
+        return PAL_ERROR_NOMEM;
     ret = callback(SHARED_MEM_ADDR, SHARED_MEM_SIZE, "shared_memory");
     if (ret < 0)
-        return -PAL_ERROR_NOMEM;
+        return PAL_ERROR_NOMEM;
     ret = callback(PCI_HOLE_ADDR, PCI_HOLE_SIZE, "qemu_pci_hole");
     if (ret < 0)
-        return -PAL_ERROR_NOMEM;
+        return PAL_ERROR_NOMEM;
 
     if (g_asan_shadow_phys_start && g_asan_shadow_phys_end) {
         ret = callback(g_asan_shadow_phys_start, g_asan_shadow_phys_end - g_asan_shadow_phys_start,
                        "asan_shadow_memory");
         if (ret < 0)
-            return -PAL_ERROR_DENIED;
+            return PAL_ERROR_DENIED;
     }
 
     return 0;
@@ -554,7 +554,7 @@ int memory_tighten_permissions(void) {
         ret = memory_mark_pages_off(g_asan_shadow_phys_start,
                                     g_asan_shadow_phys_end - g_asan_shadow_phys_start);
         if (ret < 0)
-            return -PAL_ERROR_DENIED;
+            return PAL_ERROR_DENIED;
     }
 
     return 0;
@@ -583,15 +583,15 @@ int memory_init(e820_table_entry* e820_entries, size_t e820_entries_size,
         memory_address_start = 0x1000;
 
     if (memory_address_start >= memory_address_end)
-        return -PAL_ERROR_DENIED;
+        return PAL_ERROR_DENIED;
 
     if (memory_address_start > PAGE_TABLES_ADDR ||
             memory_address_end < PAGE_TABLES_ADDR + PAGE_TABLES_SIZE)
-        return -PAL_ERROR_DENIED;
+        return PAL_ERROR_DENIED;
 
     if (memory_address_start > SHARED_MEM_ADDR ||
             memory_address_end < SHARED_MEM_ADDR + SHARED_MEM_SIZE)
-        return -PAL_ERROR_DENIED;
+        return PAL_ERROR_DENIED;
 
     *out_memory_address_start = (void*)memory_address_start;
     *out_memory_address_end   = (void*)memory_address_end;
@@ -602,7 +602,7 @@ int memory_alloc(void* addr, size_t size, bool read, bool write, bool execute) {
     if ((uintptr_t)addr < SHARED_MEM_ADDR + SHARED_MEM_SIZE &&
             SHARED_MEM_ADDR < (uintptr_t)addr + size) {
         /* [addr, addr+size) at least partially overlaps shared memory, should be impossible */
-        return -PAL_ERROR_DENIED;
+        return PAL_ERROR_DENIED;
     }
 
     if (!read && !write && !execute) {
@@ -631,7 +631,7 @@ int memory_protect(void* addr, size_t size, bool read, bool write, bool execute)
     if ((uintptr_t)addr < SHARED_MEM_ADDR + SHARED_MEM_SIZE &&
             SHARED_MEM_ADDR < (uintptr_t)addr + size) {
         /* [addr, addr+size) at least partially overlaps shared memory, should be impossible */
-        return -PAL_ERROR_DENIED;
+        return PAL_ERROR_DENIED;
     }
 
     if (!read && !write && !execute) {
@@ -652,7 +652,7 @@ int memory_free(void* addr, size_t size) {
     if ((uintptr_t)addr < SHARED_MEM_ADDR + SHARED_MEM_SIZE &&
             SHARED_MEM_ADDR < (uintptr_t)addr + size) {
         /* [addr, addr+size) at least partially overlaps shared memory, should be impossible */
-        return -PAL_ERROR_DENIED;
+        return PAL_ERROR_DENIED;
     }
 
 #ifdef ASAN

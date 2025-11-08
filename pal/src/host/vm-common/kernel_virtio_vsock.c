@@ -131,7 +131,7 @@ static int handle_rq(uint16_t host_used_idx, bool* out_received) {
     if (host_used_idx - g_vsock->rq->seen_used > g_vsock->rq->queue_size) {
         /* malicious (impossible) value reported by the host; note that this check works also in
          * cases of int wrap */
-        return -PAL_ERROR_DENIED;
+        return PAL_ERROR_DENIED;
     }
 
     while (host_used_idx != g_vsock->rq->seen_used) {
@@ -140,7 +140,7 @@ static int handle_rq(uint16_t host_used_idx, bool* out_received) {
 
         if (desc_idx >= g_vsock->rq->queue_size) {
             /* malicious (out of bounds) descriptor index */
-            return -PAL_ERROR_DENIED;
+            return PAL_ERROR_DENIED;
         }
 
         uint64_t addr = vm_shared_readq(&g_vsock->rq->desc[desc_idx].addr);
@@ -150,22 +150,22 @@ static int handle_rq(uint16_t host_used_idx, bool* out_received) {
         if (addr < (uintptr_t)g_vsock->shared_rq_buf ||
                 addr >= (uintptr_t)g_vsock->shared_rq_buf + shared_rq_buf_size) {
             /* malicious (out of bounds) address of the incoming packet */
-            return -PAL_ERROR_DENIED;
+            return PAL_ERROR_DENIED;
         }
 
         if ((addr - (uintptr_t)g_vsock->shared_rq_buf) % sizeof(struct virtio_vsock_packet)) {
             /* malicious (not aligned on packet struct size) offset of the incoming packet */
-            return -PAL_ERROR_DENIED;
+            return PAL_ERROR_DENIED;
         }
 
         if (size < sizeof(struct virtio_vsock_hdr) || size > sizeof(struct virtio_vsock_packet)) {
             /* malicious (out of bounds) size of the incoming packet */
-            return -PAL_ERROR_DENIED;
+            return PAL_ERROR_DENIED;
         }
 
         struct virtio_vsock_packet* packet = malloc(sizeof(*packet));
         if (!packet)
-            return -PAL_ERROR_NOMEM;
+            return PAL_ERROR_NOMEM;
 
         /* copy from untrusted shared memory, these contents should be verified in process_packet */
         vm_shared_memcpy(packet, (struct virtio_vsock_packet*)addr, sizeof(*packet));
@@ -268,7 +268,7 @@ static int copy_into_tq_and_free(struct virtio_vsock_packet* packet) {
     int ret = virtq_alloc_desc(g_vsock->tq, /*addr=*/NULL, packet_size, /*flags=*/0, &desc_idx);
     if (ret < 0) {
         /* if TQ buffer is full, drain TQ and try again */
-        if (ret != -PAL_ERROR_NOMEM)
+        if (ret != PAL_ERROR_NOMEM)
             goto out;
 
         spinlock_unlock(&g_vsock_transmit_lock);
@@ -309,7 +309,7 @@ static int copy_into_tq_or_add_to_pending(struct virtio_vsock_packet* packet) {
     uint16_t desc_idx;
     uint64_t packet_size = sizeof(struct virtio_vsock_hdr) + packet->header.size;
     int ret = virtq_alloc_desc(g_vsock->tq, /*addr=*/NULL, packet_size, /*flags=*/0, &desc_idx);
-    if (ret < 0 && ret != -PAL_ERROR_NOMEM)
+    if (ret < 0 && ret != PAL_ERROR_NOMEM)
         goto out;
 
     if (ret == 0) {
@@ -318,10 +318,10 @@ static int copy_into_tq_or_add_to_pending(struct virtio_vsock_packet* packet) {
     }
 
     /* TX buffer is full, append this control packet to a queue of pending packets */
-    assert(ret == -PAL_ERROR_NOMEM);
+    assert(ret == PAL_ERROR_NOMEM);
     if (g_vsock->pending_tq_control_packets_cnt == VIRTIO_VSOCK_PENDING_TQ_CONTROL_SIZE) {
         log_error("vsock queue of pending TX control packets is full, unstable behavior possible");
-        ret = -PAL_ERROR_DENIED;
+        ret = PAL_ERROR_DENIED;
         goto out;
     }
     uint32_t idx = g_vsock->pending_tq_control_packets_idx
@@ -349,7 +349,7 @@ static int cleanup_tq(void) {
     if (host_used_idx - g_vsock->tq->seen_used > g_vsock->tq->queue_size) {
         /* malicious (impossible) value reported by the host; note that this check works also in
          * cases of int wrap */
-        ret = -PAL_ERROR_DENIED;
+        ret = PAL_ERROR_DENIED;
         goto fail;
     }
 
@@ -359,13 +359,13 @@ static int cleanup_tq(void) {
 
         if (desc_idx >= g_vsock->tq->queue_size) {
             /* malicious (out of bounds) descriptor index */
-            ret = -PAL_ERROR_DENIED;
+            ret = PAL_ERROR_DENIED;
             goto fail;
         }
 
         if (virtq_is_desc_free(g_vsock->tq, desc_idx)) {
             /* malicious descriptor index (attempt at double-free attack) */
-            ret = -PAL_ERROR_DENIED;
+            ret = PAL_ERROR_DENIED;
             goto fail;
         }
 
@@ -441,7 +441,7 @@ static int enlarge_conns(uint32_t new_size) {
 
     struct virtio_vsock_connection** new_conns = calloc(new_size, sizeof(*new_conns));
     if (!new_conns)
-        return -PAL_ERROR_NOMEM;
+        return PAL_ERROR_NOMEM;
 
     memcpy(new_conns, g_vsock->conns, g_vsock->conns_size * sizeof(*new_conns));
     free(g_vsock->conns);
@@ -480,7 +480,7 @@ static int attach_connection(struct virtio_vsock_connection* conn) {
     if (idx == g_vsock->conns_size) {
         uint32_t new_size = g_vsock->conns_size;
         if (__builtin_mul_overflow(new_size, 2, &new_size))
-            return -PAL_ERROR_DENIED;
+            return PAL_ERROR_DENIED;
         int ret = enlarge_conns(new_size);
         if (ret < 0)
             return ret;
@@ -638,7 +638,7 @@ static int neglect_packet(struct virtio_vsock_packet* in) {
 
     packet = malloc(sizeof(*packet));
     if (!packet)
-        return -PAL_ERROR_NOMEM;
+        return PAL_ERROR_NOMEM;
 
     memset(packet, 0, sizeof(*packet)); /* for sanity */
 
@@ -669,7 +669,7 @@ static int send_reset_packet(struct virtio_vsock_connection* conn) {
     packet = generate_packet(conn, VIRTIO_VSOCK_OP_RST,
                              /*payload=*/NULL, /*payload_size=*/0, /*flags=*/0);
     if (!packet)
-        return -PAL_ERROR_NOMEM;
+        return PAL_ERROR_NOMEM;
 
     return copy_into_tq_or_add_to_pending(packet);
 }
@@ -682,7 +682,7 @@ static int send_request_packet(struct virtio_vsock_connection* conn) {
     packet = generate_packet(conn, VIRTIO_VSOCK_OP_REQUEST,
                              /*payload=*/NULL, /*payload_size=*/0, /*flags=*/0);
     if (!packet)
-        return -PAL_ERROR_NOMEM;
+        return PAL_ERROR_NOMEM;
 
     return copy_into_tq_or_add_to_pending(packet);
 }
@@ -696,7 +696,7 @@ static int send_response_packet(struct virtio_vsock_connection* conn) {
     packet = generate_packet(conn, VIRTIO_VSOCK_OP_RESPONSE,
                              /*payload=*/NULL, /*payload_size=*/0, /*flags=*/0);
     if (!packet)
-        return -PAL_ERROR_NOMEM;
+        return PAL_ERROR_NOMEM;
 
     return copy_into_tq_or_add_to_pending(packet);
 }
@@ -710,7 +710,7 @@ static int send_credit_update_packet(struct virtio_vsock_connection* conn) {
     packet = generate_packet(conn, VIRTIO_VSOCK_OP_CREDIT_UPDATE,
                              /*payload=*/NULL, /*payload_size=*/0, /*flags=*/0);
     if (!packet)
-        return -PAL_ERROR_NOMEM;
+        return PAL_ERROR_NOMEM;
 
     /* packet is already updated with fwd_cnt and buf_alloc */
 
@@ -726,7 +726,7 @@ static int send_shutdown_packet(struct virtio_vsock_connection* conn,
     packet = generate_packet(conn, VIRTIO_VSOCK_OP_SHUTDOWN,
                              /*payload=*/NULL, /*payload_size=*/0, flags);
     if (!packet)
-        return -PAL_ERROR_NOMEM;
+        return PAL_ERROR_NOMEM;
 
     return copy_into_tq_or_add_to_pending(packet);
 }
@@ -740,7 +740,7 @@ static int send_rw_packet(struct virtio_vsock_connection* conn, const char* payl
     /* payload is memcpy'd into the generated packet, so payload may be freed later */
     packet = generate_packet(conn, VIRTIO_VSOCK_OP_RW, payload, payload_size, /*flags=*/0);
     if (!packet)
-        return -PAL_ERROR_NOMEM;
+        return PAL_ERROR_NOMEM;
 
     return copy_into_tq_and_free(packet);
 }
@@ -755,7 +755,7 @@ static int recv_rw_packet(struct virtio_vsock_connection* conn,
     if (in_flight_packets_cnt >= VSOCK_MAX_PACKETS) {
         log_warning("RX vsock queue is full, dropping incoming RW packet (payload size %u)",
                      packet->header.size);
-        return -PAL_ERROR_NOMEM;
+        return PAL_ERROR_NOMEM;
     }
 
     uint32_t idx = conn->prepared_for_user % VSOCK_MAX_PACKETS;
@@ -771,23 +771,23 @@ static int verify_packet(struct virtio_vsock_packet* packet) {
 
     if (packet->header.size > VSOCK_MAX_PAYLOAD_SIZE) {
         log_error("malicious size of packet (%u)", packet->header.size);
-        return -PAL_ERROR_DENIED;
+        return PAL_ERROR_DENIED;
     }
 
     if (packet->header.type != VIRTIO_VSOCK_TYPE_STREAM) {
         log_error("only stream type packets are supported in vsock");
-        return -PAL_ERROR_NOTSUPPORT;
+        return PAL_ERROR_NOTSUPPORT;
     }
 
     if (packet->header.op == VIRTIO_VSOCK_OP_INVALID || packet->header.op >= VIRTIO_VSOCK_OP_MAX) {
         log_error("wrong operation (%d) on vsock packet is received", packet->header.op);
-        return -PAL_ERROR_NOTSUPPORT;
+        return PAL_ERROR_NOTSUPPORT;
     }
 
     if (packet->header.dst_cid != g_vsock->guest_cid ||
             packet->header.src_cid != g_vsock->host_cid) {
         log_error("vsock packet guest/host CIDs do not match guest/host");
-        return -PAL_ERROR_INVAL;
+        return PAL_ERROR_INVAL;
     }
 
     return 0;
@@ -830,7 +830,7 @@ static int process_packet(struct virtio_vsock_packet* packet) {
     }
 
     if (!conn) {
-        ret = -PAL_ERROR_INVAL;
+        ret = PAL_ERROR_INVAL;
         goto out;
     }
 
@@ -842,12 +842,12 @@ static int process_packet(struct virtio_vsock_packet* packet) {
             if (packet->header.op != VIRTIO_VSOCK_OP_REQUEST) {
                 if (packet->header.op == VIRTIO_VSOCK_OP_RST)
                     cleanup_connection(conn);
-                ret = -PAL_ERROR_DENIED;
+                ret = PAL_ERROR_DENIED;
                 goto out;
             }
             if (conn->pending_conn_fds_cnt == VSOCK_MAX_PENDING_CONNS) {
                 log_warning("vsock backlog full, dropping connection");
-                ret = -PAL_ERROR_OVERFLOW;
+                ret = PAL_ERROR_OVERFLOW;
                 goto out;
             }
             /* create new connection */
@@ -856,7 +856,7 @@ static int process_packet(struct virtio_vsock_packet* packet) {
                                                                          VIRTIO_VSOCK_ESTABLISHED);
             if (!new_conn) {
                 log_error("no memory for new connection");
-                ret = -PAL_ERROR_NOMEM;
+                ret = PAL_ERROR_NOMEM;
                 goto out;
             }
             ret = send_response_packet(new_conn);
@@ -875,7 +875,7 @@ static int process_packet(struct virtio_vsock_packet* packet) {
             if (packet->header.op != VIRTIO_VSOCK_OP_RESPONSE) {
                 if (packet->header.op == VIRTIO_VSOCK_OP_RST)
                     cleanup_connection(conn);
-                ret = -PAL_ERROR_DENIED;
+                ret = PAL_ERROR_DENIED;
                 goto out;
             }
             conn->state = VIRTIO_VSOCK_ESTABLISHED;
@@ -925,7 +925,7 @@ static int process_packet(struct virtio_vsock_packet* packet) {
                     cleanup_connection(conn);
                     /* fallthrough */
                 default:
-                    ret = -PAL_ERROR_DENIED;
+                    ret = PAL_ERROR_DENIED;
                     goto out;
             }
 
@@ -939,7 +939,7 @@ static int process_packet(struct virtio_vsock_packet* packet) {
 
         case VIRTIO_VSOCK_CLOSE:
             /* all packets are wrong in this state */
-            ret = -PAL_ERROR_DENIED;
+            ret = PAL_ERROR_DENIED;
             goto out;
     }
 
@@ -973,7 +973,7 @@ static int virtio_vsock_negotiate_features(struct virtio_vsock* vsock) {
     advertised_features = vm_mmio_readl(&pci_regs->device_feature);
 
     if (!(advertised_features & (1 << VIRTIO_F_VERSION_1)))
-        return -PAL_ERROR_DENIED;
+        return PAL_ERROR_DENIED;
 
     understood_features = 1 << VIRTIO_F_VERSION_1;
 
@@ -993,13 +993,13 @@ static int virtio_vsock_alloc(struct virtio_vsock** out_vsock) {
 
     vsock = malloc(sizeof(*vsock));
     if (!vsock)
-        return -PAL_ERROR_NOMEM;
+        return PAL_ERROR_NOMEM;
     memset(vsock, 0, sizeof(*vsock)); /* for sanity */
 
     shared_rq_buf = memory_get_shared_region(VIRTIO_VSOCK_SHARED_BUF_SIZE);
     shared_tq_buf = memory_get_shared_region(VIRTIO_VSOCK_SHARED_BUF_SIZE);
     if (!shared_rq_buf || !shared_tq_buf) {
-        ret = -PAL_ERROR_NOMEM;
+        ret = PAL_ERROR_NOMEM;
         goto fail;
     }
 
@@ -1086,13 +1086,13 @@ int virtio_vsock_init(struct virtio_pci_regs* pci_regs, struct virtio_vsock_conf
 
     conns = calloc(VIRTIO_VSOCK_CONNS_INIT_SIZE, sizeof(*conns));
     if (!conns) {
-        ret = -PAL_ERROR_NOMEM;
+        ret = PAL_ERROR_NOMEM;
         goto fail;
     }
 
     control_packets = calloc(VIRTIO_VSOCK_PENDING_TQ_CONTROL_SIZE, sizeof(*control_packets));
     if (!control_packets) {
-        ret = -PAL_ERROR_NOMEM;
+        ret = PAL_ERROR_NOMEM;
         goto fail;
     }
 
@@ -1110,7 +1110,7 @@ int virtio_vsock_init(struct virtio_pci_regs* pci_regs, struct virtio_vsock_conf
     status = vm_mmio_readb(&pci_regs->device_status);
     if (!(status & VIRTIO_STATUS_FEATURES_OK)) {
         /* host device (vhost-vsock) did not accept our features */
-        ret = -PAL_ERROR_DENIED;
+        ret = PAL_ERROR_DENIED;
         goto fail;
     }
 
@@ -1134,7 +1134,7 @@ int virtio_vsock_init(struct virtio_pci_regs* pci_regs, struct virtio_vsock_conf
     if (!(PCI_MMIO_START_ADDR <= (uintptr_t)vsock->rq_notify_addr &&
                 (uintptr_t)vsock->rq_notify_addr + rq_notify_addr_size < PCI_MMIO_END_ADDR)) {
         /* incorrect or malicious RQ queue notify addr */
-        ret = -PAL_ERROR_DENIED;
+        ret = PAL_ERROR_DENIED;
         goto fail;
     }
 
@@ -1146,7 +1146,7 @@ int virtio_vsock_init(struct virtio_pci_regs* pci_regs, struct virtio_vsock_conf
     if (!(PCI_MMIO_START_ADDR <= (uintptr_t)vsock->tq_notify_addr &&
                 (uintptr_t)vsock->tq_notify_addr + tq_notify_addr_size < PCI_MMIO_END_ADDR)) {
         /* incorrect or malicious TQ queue notify addr */
-        ret = -PAL_ERROR_DENIED;
+        ret = PAL_ERROR_DENIED;
         goto fail;
     }
 
@@ -1157,7 +1157,7 @@ int virtio_vsock_init(struct virtio_pci_regs* pci_regs, struct virtio_vsock_conf
     if (vsock->guest_cid <= 2 || vsock->guest_cid >= 0xffffffff) {
         /* incorrect or malicious guest CID: CIDs 0,1,0xffffffff are reserved, CID 2 is for the
          * host, and upper 32 bits of CID must be zeroed */
-        ret = -PAL_ERROR_DENIED;
+        ret = PAL_ERROR_DENIED;
         goto fail;
     }
 
@@ -1188,20 +1188,20 @@ int virtio_vsock_socket(int domain, int type, int protocol) {
     int ret;
 
     if (domain != AF_VSOCK)
-        return -PAL_ERROR_AFNOSUPPORT;
+        return PAL_ERROR_AFNOSUPPORT;
 
     if (type != VIRTIO_VSOCK_TYPE_STREAM)
-        return -PAL_ERROR_INVAL;
+        return PAL_ERROR_INVAL;
 
     if (protocol != 0)
-        return -PAL_ERROR_NOTSUPPORT;
+        return PAL_ERROR_NOTSUPPORT;
 
     spinlock_lock(&g_vsock_connections_lock);
     struct virtio_vsock_connection* conn = create_connection(/*host_port=*/0, /*guest_port=*/0,
                                                              VIRTIO_VSOCK_CLOSE);
     if (!conn) {
         log_error("no memory for new connection");
-        ret = -PAL_ERROR_NOMEM;
+        ret = PAL_ERROR_NOMEM;
         goto out;
     }
     ret = conn->fd;
@@ -1215,27 +1215,27 @@ int virtio_vsock_bind(int sockfd, const void* addr, size_t addrlen, uint16_t* ou
     int ret;
 
     if (!addr || addrlen < sizeof(struct sockaddr_vm))
-        return -PAL_ERROR_INVAL;
+        return PAL_ERROR_INVAL;
 
     if (sockfd < 0)
-        return -PAL_ERROR_BADHANDLE;
+        return PAL_ERROR_BADHANDLE;
 
     spinlock_lock(&g_vsock_connections_lock);
 
     struct virtio_vsock_connection* conn = get_connection(sockfd);
     if (!conn) {
-        ret = -PAL_ERROR_BADHANDLE;
+        ret = PAL_ERROR_BADHANDLE;
         goto out;
     }
 
     if (conn->state != VIRTIO_VSOCK_CLOSE || conn->guest_port != 0) {
-        ret = -PAL_ERROR_INVAL;
+        ret = PAL_ERROR_INVAL;
         goto out;
     }
 
     struct sockaddr_vm* addr_vm = (struct sockaddr_vm*)addr;
     if (addr_vm->svm_family != AF_VSOCK || addr_vm->svm_cid != g_vsock->guest_cid) {
-        ret = -PAL_ERROR_INVAL;
+        ret = PAL_ERROR_INVAL;
         goto out;
     }
 
@@ -1264,7 +1264,7 @@ int virtio_vsock_bind(int sockfd, const void* addr, size_t addrlen, uint16_t* ou
                 continue;
             }
 
-            ret = -PAL_ERROR_STREAMEXIST;
+            ret = PAL_ERROR_STREAMEXIST;
             goto out;
         }
     }
@@ -1296,30 +1296,30 @@ int virtio_vsock_listen(int sockfd, int backlog) {
     int ret;
 
     if (sockfd < 0)
-        return -PAL_ERROR_BADHANDLE;
+        return PAL_ERROR_BADHANDLE;
 
     spinlock_lock(&g_vsock_connections_lock);
 
     struct virtio_vsock_connection* conn = get_connection(sockfd);
     if (!conn) {
-        ret = -PAL_ERROR_BADHANDLE;
+        ret = PAL_ERROR_BADHANDLE;
         goto out;
     }
 
     if (conn->state != VIRTIO_VSOCK_CLOSE) {
-        ret = -PAL_ERROR_STREAMEXIST;
+        ret = PAL_ERROR_STREAMEXIST;
         goto out;
     }
 
     if (conn->guest_port == 0) {
         /* not yet bound */
-        ret = -PAL_ERROR_STREAMNOTEXIST;
+        ret = PAL_ERROR_STREAMNOTEXIST;
         goto out;
     }
 
     uint32_t* pending_conn_fds = calloc(VSOCK_MAX_PENDING_CONNS, sizeof(*pending_conn_fds));
     if (!pending_conn_fds) {
-        ret = -PAL_ERROR_NOMEM;
+        ret = PAL_ERROR_NOMEM;
         goto out;
     }
 
@@ -1338,27 +1338,27 @@ int virtio_vsock_accept(int sockfd, void* addr, size_t* addrlen) {
     int ret;
 
     if (!addr || !addrlen || *addrlen < sizeof(struct sockaddr_vm))
-        return -PAL_ERROR_INVAL;
+        return PAL_ERROR_INVAL;
 
     if (sockfd < 0)
-        return -PAL_ERROR_BADHANDLE;
+        return PAL_ERROR_BADHANDLE;
 
     spinlock_lock(&g_vsock_connections_lock);
 
     struct virtio_vsock_connection* conn = get_connection(sockfd);
     if (!conn) {
-        ret = -PAL_ERROR_BADHANDLE;
+        ret = PAL_ERROR_BADHANDLE;
         goto out;
     }
 
     if (conn->state != VIRTIO_VSOCK_LISTEN) {
-        ret = -PAL_ERROR_INVAL;
+        ret = PAL_ERROR_INVAL;
         goto out;
     }
 
     if (conn->pending_conn_fds_cnt == 0) {
         /* non-blocking caller must return TRYAGAIN; blocking caller must sleep on this */
-        ret = -PAL_ERROR_TRYAGAIN;
+        ret = PAL_ERROR_TRYAGAIN;
         goto out;
     }
 
@@ -1366,7 +1366,7 @@ int virtio_vsock_accept(int sockfd, void* addr, size_t* addrlen) {
     uint32_t accepted_conn_fd = conn->pending_conn_fds[idx];
     struct virtio_vsock_connection* accepted_conn = get_connection(accepted_conn_fd);
     if (!accepted_conn) {
-        ret = -PAL_ERROR_DENIED;
+        ret = PAL_ERROR_DENIED;
         goto out;
     }
 
@@ -1393,24 +1393,24 @@ int virtio_vsock_connect(int sockfd, const void* addr, size_t addrlen, uint64_t 
     struct sockaddr_vm* addr_vm = (struct sockaddr_vm*)addr;
 
     if (!addr || addrlen < sizeof(struct sockaddr_vm))
-        return -PAL_ERROR_INVAL;
+        return PAL_ERROR_INVAL;
 
     if (sockfd < 0)
-        return -PAL_ERROR_BADHANDLE;
+        return PAL_ERROR_BADHANDLE;
 
     if (timeout_us == 0)
-        return -PAL_ERROR_INVAL;
+        return PAL_ERROR_INVAL;
 
     spinlock_lock(&g_vsock_connections_lock);
 
     struct virtio_vsock_connection* conn = get_connection(sockfd);
     if (!conn) {
-        ret = -PAL_ERROR_BADHANDLE;
+        ret = PAL_ERROR_BADHANDLE;
         goto out;
     }
 
     if (conn->state != VIRTIO_VSOCK_CLOSE) {
-        ret = -PAL_ERROR_STREAMEXIST;
+        ret = PAL_ERROR_STREAMEXIST;
         goto out;
     }
 
@@ -1437,7 +1437,7 @@ int virtio_vsock_connect(int sockfd, const void* addr, size_t addrlen, uint64_t 
 
     while (conn->state != VIRTIO_VSOCK_ESTABLISHED) {
         if (conn->state != VIRTIO_VSOCK_CONNECT) {
-            ret = -PAL_ERROR_CONNFAILED;
+            ret = PAL_ERROR_CONNFAILED;
             goto out;
         }
 
@@ -1450,7 +1450,7 @@ int virtio_vsock_connect(int sockfd, const void* addr, size_t addrlen, uint64_t 
             goto out;
 
         if (timeout_absolute_us <= curr_time_us) {
-            ret = -PAL_ERROR_CONNFAILED; /* must return ETIMEOUT but PAL doesn't have such code */
+            ret = PAL_ERROR_CONNFAILED; /* must return ETIMEOUT but PAL doesn't have such code */
             goto out;
         }
 
@@ -1470,21 +1470,21 @@ int virtio_vsock_getsockname(int sockfd, const void* addr, size_t* addrlen) {
     int ret;
 
     if (!addr || !addrlen || *addrlen < sizeof(struct sockaddr_vm))
-        return -PAL_ERROR_INVAL;
+        return PAL_ERROR_INVAL;
 
     if (sockfd < 0)
-        return -PAL_ERROR_BADHANDLE;
+        return PAL_ERROR_BADHANDLE;
 
     spinlock_lock(&g_vsock_connections_lock);
 
     struct virtio_vsock_connection* conn = get_connection(sockfd);
     if (!conn) {
-        ret = -PAL_ERROR_BADHANDLE;
+        ret = PAL_ERROR_BADHANDLE;
         goto out;
     }
 
     if (conn->state == VIRTIO_VSOCK_CLOSE) {
-        ret = -PAL_ERROR_BADHANDLE;
+        ret = PAL_ERROR_BADHANDLE;
         goto out;
     }
 
@@ -1503,14 +1503,14 @@ out:
 
 int virtio_vsock_set_socket_options(int sockfd, bool ipv6_v6only, bool reuseport) {
     if (sockfd < 0)
-        return -PAL_ERROR_BADHANDLE;
+        return PAL_ERROR_BADHANDLE;
 
     spinlock_lock(&g_vsock_connections_lock);
 
     struct virtio_vsock_connection* conn = get_connection(sockfd);
     if (!conn) {
         spinlock_unlock(&g_vsock_connections_lock);
-        return -PAL_ERROR_BADHANDLE;
+        return PAL_ERROR_BADHANDLE;
     }
 
     conn->ipv6_v6only = ipv6_v6only;
@@ -1524,14 +1524,14 @@ long virtio_vsock_peek(int sockfd) {
     long ret;
 
     if (sockfd < 0)
-        return -PAL_ERROR_BADHANDLE;
+        return PAL_ERROR_BADHANDLE;
 
     spinlock_lock(&g_vsock_connections_lock);
 
     struct virtio_vsock_connection* conn = get_connection(sockfd);
     if (!conn) {
         spinlock_unlock(&g_vsock_connections_lock);
-        return -PAL_ERROR_BADHANDLE;
+        return PAL_ERROR_BADHANDLE;
     }
 
     switch (conn->state) {
@@ -1553,7 +1553,7 @@ long virtio_vsock_peek(int sockfd) {
         }
         default:
             /* CLOSE or CLOSING states -- connection is shutdown or in the process of closing */
-            ret = -PAL_ERROR_DENIED;
+            ret = PAL_ERROR_DENIED;
             break;
     }
 
@@ -1565,21 +1565,21 @@ long virtio_vsock_read(int sockfd, void* buf, size_t count) {
     long ret;
 
     if (!buf)
-        return -PAL_ERROR_BADADDR;
+        return PAL_ERROR_BADADDR;
 
     if (sockfd < 0)
-        return -PAL_ERROR_BADHANDLE;
+        return PAL_ERROR_BADHANDLE;
 
     spinlock_lock(&g_vsock_connections_lock);
 
     struct virtio_vsock_connection* conn = get_connection(sockfd);
     if (!conn) {
-        ret = -PAL_ERROR_BADHANDLE;
+        ret = PAL_ERROR_BADHANDLE;
         goto out;
     }
 
     if (conn->state != VIRTIO_VSOCK_ESTABLISHED) {
-        ret = -PAL_ERROR_NOTCONNECTION;
+        ret = PAL_ERROR_NOTCONNECTION;
         goto out;
     }
 
@@ -1596,7 +1596,7 @@ long virtio_vsock_read(int sockfd, void* buf, size_t count) {
             goto out;
         }
         /* non-blocking caller must return TRYAGAIN; blocking caller must sleep on this */
-        ret = -PAL_ERROR_TRYAGAIN;
+        ret = PAL_ERROR_TRYAGAIN;
         goto out;
     }
 
@@ -1635,27 +1635,27 @@ long virtio_vsock_write(int sockfd, const void* buf, size_t count) {
     long ret;
 
     if (!buf)
-        return -PAL_ERROR_BADADDR;
+        return PAL_ERROR_BADADDR;
 
     if (sockfd < 0)
-        return -PAL_ERROR_BADHANDLE;
+        return PAL_ERROR_BADHANDLE;
 
     spinlock_lock(&g_vsock_connections_lock);
 
     struct virtio_vsock_connection* conn = get_connection(sockfd);
     if (!conn) {
-        ret = -PAL_ERROR_BADHANDLE;
+        ret = PAL_ERROR_BADHANDLE;
         goto out;
     }
 
     if (conn->state != VIRTIO_VSOCK_ESTABLISHED) {
-        ret = -PAL_ERROR_NOTCONNECTION;
+        ret = PAL_ERROR_NOTCONNECTION;
         goto out;
     }
 
     if (conn->send_disallowed) {
         /* we were instructed to not send more packets, return -EPIPE type of error */
-        ret = -PAL_ERROR_CONNFAILED_PIPE;
+        ret = PAL_ERROR_CONNFAILED_PIPE;
         goto out;
     }
 
@@ -1670,14 +1670,14 @@ long virtio_vsock_write(int sockfd, const void* buf, size_t count) {
         size_t payload_size = MIN(count - sent, VSOCK_MAX_PAYLOAD_SIZE);
         ret = send_rw_packet(conn, buf + sent, payload_size);
         if (ret < 0) {
-            if (ret == -PAL_ERROR_NOMEM && sent != 0) {
+            if (ret == PAL_ERROR_NOMEM && sent != 0) {
                 /* TX buffer is full, do not return error but instead whatever was sent */
                 ret = (long)sent;
             }
-            if (ret == -PAL_ERROR_NOMEM) {
+            if (ret == PAL_ERROR_NOMEM) {
                 /* TX buffer is full and we haven't sent anything -> a write would block;
                  * non-blocking caller must return TRYAGAIN; blocking caller must sleep on this */
-                ret = -PAL_ERROR_TRYAGAIN;
+                ret = PAL_ERROR_TRYAGAIN;
             }
             goto out;
         }
@@ -1709,7 +1709,7 @@ static int virtio_vsock_close_common(struct virtio_vsock_connection* conn, uint6
     }
 
     if (conn->state != VIRTIO_VSOCK_ESTABLISHED) {
-        ret = -PAL_ERROR_NOTCONNECTION;
+        ret = PAL_ERROR_NOTCONNECTION;
         goto out;
     }
 
@@ -1731,7 +1731,7 @@ static int virtio_vsock_close_common(struct virtio_vsock_connection* conn, uint6
 
     while (conn->state != VIRTIO_VSOCK_CLOSE) {
         if (conn->state != VIRTIO_VSOCK_CLOSING) {
-            ret = -PAL_ERROR_DENIED;
+            ret = PAL_ERROR_DENIED;
             goto out;
         }
 
@@ -1744,7 +1744,7 @@ static int virtio_vsock_close_common(struct virtio_vsock_connection* conn, uint6
             goto out;
 
         if (timeout_absolute_us <= curr_time_us) {
-            ret = -PAL_ERROR_DENIED;
+            ret = PAL_ERROR_DENIED;
             goto out;
         }
 
@@ -1763,18 +1763,18 @@ int virtio_vsock_shutdown(int sockfd, enum virtio_vsock_shutdown shutdown) {
     int ret;
 
     if (sockfd < 0)
-        return -PAL_ERROR_BADHANDLE;
+        return PAL_ERROR_BADHANDLE;
 
     spinlock_lock(&g_vsock_connections_lock);
 
     struct virtio_vsock_connection* conn = get_connection(sockfd);
     if (!conn) {
-        ret = -PAL_ERROR_BADHANDLE;
+        ret = PAL_ERROR_BADHANDLE;
         goto out;
     }
 
     if (conn->state != VIRTIO_VSOCK_ESTABLISHED && conn->state != VIRTIO_VSOCK_LISTEN) {
-        ret = -PAL_ERROR_NOTCONNECTION;
+        ret = PAL_ERROR_NOTCONNECTION;
         goto out;
     }
 
@@ -1793,13 +1793,13 @@ int virtio_vsock_close(int sockfd, uint64_t timeout_us) {
     int ret;
 
     if (sockfd < 0)
-        return -PAL_ERROR_BADHANDLE;
+        return PAL_ERROR_BADHANDLE;
 
     spinlock_lock(&g_vsock_connections_lock);
 
     struct virtio_vsock_connection* conn = get_connection(sockfd);
     if (!conn) {
-        ret = -PAL_ERROR_BADHANDLE;
+        ret = PAL_ERROR_BADHANDLE;
         goto out;
     }
 

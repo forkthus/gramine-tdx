@@ -71,7 +71,7 @@ int thread_get_stack_and_fpregs(void** out_stack, void** out_fpregs) {
         g_thread_stack_size += 8;
         struct thread_stack_map_t* tmp = malloc(g_thread_stack_size * sizeof(*tmp));
         if (!tmp) {
-            ret = -PAL_ERROR_NOMEM;
+            ret = PAL_ERROR_NOMEM;
             goto out;
         }
 
@@ -82,7 +82,7 @@ int thread_get_stack_and_fpregs(void** out_stack, void** out_fpregs) {
 
     stack_base = malloc(stack_and_fpregs_size);
     if (!stack_base) {
-        ret = -PAL_ERROR_NOMEM;
+        ret = PAL_ERROR_NOMEM;
         goto out;
     }
 
@@ -167,7 +167,7 @@ void thread_setup(struct thread* thread, void* fpregs, void* stack, int (*callba
 int thread_helper_create(int (*callback)(void*), struct thread** out_thread) {
     struct thread* thread = calloc(1, sizeof(*thread));
     if (!thread)
-        return -PAL_ERROR_NOMEM;
+        return PAL_ERROR_NOMEM;
 
     /* allocate both the stack and the fpregs (XSAVE) memory region in one go; note that
      * fpregs may be allocated not at VM_XSAVE_ALIGN boundary, so need to add a margin for that */
@@ -175,7 +175,7 @@ int thread_helper_create(int (*callback)(void*), struct thread** out_thread) {
     void* stack_base = malloc(THREAD_STACK_SIZE + ALT_STACK_SIZE + g_xsave_size + VM_XSAVE_ALIGN);
     if (!stack_base) {
         free(thread);
-        return -PAL_ERROR_NOMEM;
+        return PAL_ERROR_NOMEM;
     }
     void* stack  = stack_base;
     void* fpregs = stack_base + THREAD_STACK_SIZE + ALT_STACK_SIZE;

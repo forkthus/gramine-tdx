@@ -33,7 +33,7 @@ int _PalVirtualMemoryProtect(void* addr, size_t size, pal_prot_flags_t prot) {
     if ((uintptr_t)addr < SHARED_MEM_ADDR + SHARED_MEM_SIZE &&
             SHARED_MEM_ADDR < (uintptr_t)addr + size) {
         /* [addr, addr+size) at least partially overlaps shared memory, should be impossible */
-        return -PAL_ERROR_DENIED;
+        return PAL_ERROR_DENIED;
     }
 
     bool read    = !!(prot & PAL_PROT_READ);

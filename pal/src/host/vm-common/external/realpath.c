@@ -28,26 +28,26 @@ int realpath(const char* path, char* got_path, char** out_got_path) {
     int readlinks = 0;
 
     if (path == NULL)
-        return -PAL_ERROR_INVAL;
+        return PAL_ERROR_INVAL;
 
     if (*path == '\0')
-        return -PAL_ERROR_STREAMNOTEXIST;
+        return PAL_ERROR_STREAMNOTEXIST;
 
     size_t host_pwd_len = strlen(g_host_pwd);
     if (host_pwd_len >= PATH_MAX - 2)
-        return -PAL_ERROR_TOOLONG;
+        return PAL_ERROR_TOOLONG;
 
     /* Make a copy of the source path since we may need to modify it. */
     size_t path_len = strlen(path);
     if (path_len >= PATH_MAX - 2)
-        return -PAL_ERROR_TOOLONG;
+        return PAL_ERROR_TOOLONG;
 
     /* Copy so that path is at the end of copy_path[] */
     memcpy(copy_path + (PATH_MAX - 1) - path_len, path, path_len + 1);
     path = copy_path + (PATH_MAX - 1) - path_len;
     allocated_path = got_path ? NULL : (got_path = malloc(PATH_MAX));
     if (!got_path)
-        return -PAL_ERROR_NOMEM;
+        return PAL_ERROR_NOMEM;
 
     max_path = got_path + PATH_MAX - 2; /* points to last non-NUL char */
     new_path = got_path;
@@ -91,7 +91,7 @@ int realpath(const char* path, char* got_path, char** out_got_path) {
         /* Safely copy the next pathname component. */
         while (*path != '\0' && *path != '/') {
             if (new_path > max_path) {
-                ret = -PAL_ERROR_TOOLONG;
+                ret = PAL_ERROR_TOOLONG;
                 goto out;
             }
             *new_path++ = *path++;
@@ -99,7 +99,7 @@ int realpath(const char* path, char* got_path, char** out_got_path) {
 
         /* Protect against infinite loops. */
         if (readlinks++ > MAX_READLINKS) {
-            ret = -PAL_ERROR_DENIED;
+            ret = PAL_ERROR_DENIED;
             goto out;
         }
 
@@ -118,13 +118,13 @@ int realpath(const char* path, char* got_path, char** out_got_path) {
         if (ret < 0) {
             /* PAL_ERROR_INVAL means the file exists but isn't a symlink, that's benign, simply
              * continue with next pathname component */
-            if (ret == -PAL_ERROR_INVAL) {
+            if (ret == PAL_ERROR_INVAL) {
                 *new_path++ = '/';
                 continue;
             }
             /* Linux and virtiofsd return -ENOENT on non-symlink files when using the format
              * `readlinkat(dirfd, "")`, see https://gitlab.com/virtio-fs/virtiofsd/-/issues/91 */
-            if (ret == -PAL_ERROR_STREAMNOTEXIST) {
+            if (ret == PAL_ERROR_STREAMNOTEXIST) {
                 *new_path++ = '/';
                 continue;
             }
@@ -134,7 +134,7 @@ int realpath(const char* path, char* got_path, char** out_got_path) {
         }
 
         if (path_len + link_len >= PATH_MAX - 2) {
-            ret = -PAL_ERROR_TOOLONG;
+            ret = PAL_ERROR_TOOLONG;
             goto out;
         }
         /* Note: readlink doesn't add the null byte. */

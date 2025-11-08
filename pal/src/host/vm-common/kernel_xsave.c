@@ -43,18 +43,18 @@ int xsave_init(void) {
 
     if (!(words[CPUID_WORD_ECX] & CPUID_FEATURE_XSAVE) ||
         !(words[CPUID_WORD_ECX] & CPUID_FEATURE_OSXSAVE))
-        return -PAL_ERROR_INVAL;
+        return PAL_ERROR_INVAL;
 
     cpuid(EXTENDED_STATE_LEAF, 0, words);
 
     uint32_t xsavesize = words[CPUID_WORD_ECX];
     uint64_t xfeatures = words[CPUID_WORD_EAX] | ((uint64_t)words[CPUID_WORD_EDX] << 32);
     if (!xsavesize || !xfeatures)
-        return -PAL_ERROR_INVAL;
+        return PAL_ERROR_INVAL;
 
     if (!(xfeatures & ~VM_XFEATURE_MASK_FPSSE)) {
         /* VM supports only x87 and SSE, can't use XSAVE (it was introduced with AVX) */
-        return -PAL_ERROR_INVAL;
+        return PAL_ERROR_INVAL;
     }
 
     /* enable AVX256 in XCR0 if available in CPUID leaf (here and below, see Intel SDM, Vol. 1,

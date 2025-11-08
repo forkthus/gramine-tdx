@@ -28,7 +28,7 @@ void _PalThreadYieldExecution(void) {
 
 int _PalThreadResume(struct pal_handle* thread) {
     __UNUSED(thread);
-    return -PAL_ERROR_NOTIMPLEMENTED;
+    return PAL_ERROR_NOTIMPLEMENTED;
 }
 
 int _PalThreadSetCpuAffinity(struct pal_handle* thread, unsigned long* cpu_mask,

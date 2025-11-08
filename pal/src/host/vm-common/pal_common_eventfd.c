@@ -23,14 +23,14 @@ int pal_common_eventfd_open(struct pal_handle** handle, const char* type, const 
     assert(create == PAL_CREATE_IGNORED);
 
     if (!WITHIN_MASK(options, PAL_OPTION_MASK))
-        return -PAL_ERROR_INVAL;
+        return PAL_ERROR_INVAL;
 
     if (strcmp(type, URI_TYPE_EVENTFD) != 0 || *uri != '\0')
-        return -PAL_ERROR_INVAL;
+        return PAL_ERROR_INVAL;
 
     struct pal_handle* eventfd = calloc(1, sizeof(*eventfd));
     if (!eventfd)
-        return -PAL_ERROR_NOMEM;
+        return PAL_ERROR_NOMEM;
 
     eventfd->hdr.type = PAL_TYPE_EVENTFD;
     eventfd->flags = PAL_HANDLE_FD_READABLE | PAL_HANDLE_FD_WRITABLE;
@@ -44,20 +44,20 @@ int pal_common_eventfd_open(struct pal_handle** handle, const char* type, const 
 int64_t pal_common_eventfd_read(struct pal_handle* handle, uint64_t offset, uint64_t len,
                                 void* buffer) {
     if (offset)
-        return -PAL_ERROR_INVAL;
+        return PAL_ERROR_INVAL;
 
     if (handle->hdr.type != PAL_TYPE_EVENTFD)
-        return -PAL_ERROR_NOTCONNECTION;
+        return PAL_ERROR_NOTCONNECTION;
 
     if (len < sizeof(uint64_t))
-        return -PAL_ERROR_INVAL;
+        return PAL_ERROR_INVAL;
 
     spinlock_lock(&handle->eventfd.lock);
 
     while (!handle->eventfd.val) {
         if (handle->eventfd.nonblocking) {
             spinlock_unlock(&handle->eventfd.lock);
-            return -PAL_ERROR_TRYAGAIN;
+            return PAL_ERROR_TRYAGAIN;
         }
 
         sched_thread_wait(&handle->eventfd.reader_futex, &handle->eventfd.lock);
@@ -82,18 +82,18 @@ int64_t pal_common_eventfd_read(struct pal_handle* handle, uint64_t offset, uint
 int64_t pal_common_eventfd_write(struct pal_handle* handle, uint64_t offset, uint64_t len,
                                  const void* buffer) {
     if (offset)
-        return -PAL_ERROR_INVAL;
+        return PAL_ERROR_INVAL;
 
     if (handle->hdr.type != PAL_TYPE_EVENTFD)
-        return -PAL_ERROR_NOTCONNECTION;
+        return PAL_ERROR_NOTCONNECTION;
 
     if (len < sizeof(uint64_t))
-        return -PAL_ERROR_INVAL;
+        return PAL_ERROR_INVAL;
 
     uint64_t buf_val;
     memcpy(&buf_val, buffer, sizeof(uint64_t));
     if (buf_val == UINT64_MAX)
-        return -PAL_ERROR_INVAL;
+        return PAL_ERROR_INVAL;
 
     spinlock_lock(&handle->eventfd.lock);
 
@@ -101,7 +101,7 @@ int64_t pal_common_eventfd_write(struct pal_handle* handle, uint64_t offset, uin
     while (__builtin_add_overflow(handle->eventfd.val, buf_val, &val) || val > UINT64_MAX - 1) {
         if (handle->eventfd.nonblocking) {
             spinlock_unlock(&handle->eventfd.lock);
-            return -PAL_ERROR_TRYAGAIN;
+            return PAL_ERROR_TRYAGAIN;
         }
 
         sched_thread_wait(&handle->eventfd.writer_futex, &handle->eventfd.lock);

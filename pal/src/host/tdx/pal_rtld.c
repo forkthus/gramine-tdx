@@ -17,5 +17,5 @@ int _PalDebugDescribeLocation(uintptr_t addr, char* buf, size_t buf_size) {
     __UNUSED(addr);
     __UNUSED(buf);
     __UNUSED(buf_size);
-    return -PAL_ERROR_NOTIMPLEMENTED;
+    return PAL_ERROR_NOTIMPLEMENTED;
 }

@@ -19,7 +19,7 @@
 int pal_common_event_create(struct pal_handle** handle_ptr, bool init_signaled, bool auto_clear) {
     struct pal_handle* handle = calloc(1, HANDLE_SIZE(event));
     if (!handle)
-        return -PAL_ERROR_NOMEM;
+        return PAL_ERROR_NOMEM;
 
     init_handle_hdr(handle, PAL_TYPE_EVENT);
     spinlock_init(&handle->event.lock);
@@ -87,7 +87,7 @@ int pal_common_event_wait(struct pal_handle* handle, uint64_t* timeout_us) {
         if (timeout_us) {
             if (*timeout_us == 0) {
                 /* user instructed not to sleep, so return immediately */
-                ret = -PAL_ERROR_TRYAGAIN;
+                ret = PAL_ERROR_TRYAGAIN;
                 goto out;
             }
 
@@ -100,7 +100,7 @@ int pal_common_event_wait(struct pal_handle* handle, uint64_t* timeout_us) {
                 goto out;
 
             if (timeout_absolute_us <= curr_time_us) {
-                ret = -PAL_ERROR_TRYAGAIN;
+                ret = PAL_ERROR_TRYAGAIN;
                 goto out;
             }
         }

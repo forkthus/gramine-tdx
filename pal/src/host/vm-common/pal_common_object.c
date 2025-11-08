@@ -158,7 +158,7 @@ static int check_handle(struct pal_handle* handle, pal_wait_flags_t events,
     }
 
     /* cannot recognize this handle */
-    return -PAL_ERROR_INVAL;
+    return PAL_ERROR_INVAL;
 }
 
 int pal_common_streams_wait_events(size_t count, struct pal_handle** handle_array,
@@ -207,7 +207,7 @@ int pal_common_streams_wait_events(size_t count, struct pal_handle** handle_arra
 
         if (timeout_us) {
             if (*timeout_us == 0) {
-                ret = -PAL_ERROR_TRYAGAIN;
+                ret = PAL_ERROR_TRYAGAIN;
                 goto out;
             }
 
@@ -220,7 +220,7 @@ int pal_common_streams_wait_events(size_t count, struct pal_handle** handle_arra
                 goto out;
 
             if (timeout_absolute_us <= curr_time_us) {
-                ret = -PAL_ERROR_TRYAGAIN;
+                ret = PAL_ERROR_TRYAGAIN;
                 goto out;
             }
         }

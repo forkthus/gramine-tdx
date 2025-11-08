@@ -52,7 +52,7 @@ int init_multicore_prepare(uint32_t num_cpus) {
     char* per_cpu_scheduling_stack = calloc(num_cpus, SCHEDULING_STACK_SIZE);
     if (!g_per_cpu_data || !per_cpu_interrupt_stack || !per_cpu_interrupt_xsave_area
             || !per_cpu_scheduling_stack) {
-        ret = -PAL_ERROR_NOMEM;
+        ret = PAL_ERROR_NOMEM;
         goto out;
     }
 
@@ -106,7 +106,7 @@ static int init_multicore_mp_wakeup_mailbox(uint32_t num_cpus, void* hob_list_ad
     if (ret < 0)
         return ret;
     if (!mailbox_addr || apic_ids_size != num_cpus)
-        return -PAL_ERROR_INVAL;
+        return PAL_ERROR_INVAL;
 
     struct mp_wakeup_mailbox* mailbox = (struct mp_wakeup_mailbox*)mailbox_addr;
     mailbox->wakeup_vector = AP_STARTUP_PAGE_ADDRESS;
@@ -127,7 +127,7 @@ static int init_multicore_mp_wakeup_mailbox(uint32_t num_cpus, void* hob_list_ad
             /* BSP waits until the AP acknowledges the receipt of the wakeup command */
             if (tries++ > 5) {
                 log_error("Waited for CPU %lu to wakeup via mailbox, but timed out", i);
-                return -PAL_ERROR_DENIED;
+                return PAL_ERROR_DENIED;
             }
             ret = delay(/*delay_us=*/100UL, /*continue_gate=*/NULL);
             if (ret < 0)
@@ -198,7 +198,7 @@ int init_multicore(uint32_t num_cpus, void* hob_list_addr) {
         uint64_t msr = rdmsr(MSR_IA32_APIC_BASE);
         if (!(msr & (1 << 8))) {
             log_error("Initial CPU is not a BSP, impossible (APIC_BASE MSR is 0x%lx)", msr);
-            return -PAL_ERROR_DENIED;
+            return PAL_ERROR_DENIED;
         }
     }
 
@@ -206,7 +206,7 @@ int init_multicore(uint32_t num_cpus, void* hob_list_addr) {
     if (ap_start_page_size > AP_STARTUP_PAGE_SIZE) {
         log_error("AP startup code page size exceeds 4KB, impossible (size is %lu)",
                   ap_start_page_size);
-        return -PAL_ERROR_DENIED;
+        return PAL_ERROR_DENIED;
     }
 
     /* Copy asm code of AP (Application Processors) startup to lower 1MB in memory; after copying we
@@ -244,7 +244,7 @@ int init_multicore(uint32_t num_cpus, void* hob_list_addr) {
     while (__atomic_load_n(&g_started_cpus, __ATOMIC_SEQ_CST) != num_cpus) {
         if (tries++ > num_cpus * 5) {
             log_error("Waited for %u CPUs to start initialization, but timed out", num_cpus);
-            return -PAL_ERROR_DENIED;
+            return PAL_ERROR_DENIED;
         }
         ret = delay(/*delay_us=*/10000UL, /*continue_gate=*/NULL);
         if (ret < 0)
@@ -255,7 +255,7 @@ int init_multicore(uint32_t num_cpus, void* hob_list_addr) {
     while (__atomic_load_n(&g_ready_cpus, __ATOMIC_SEQ_CST) != num_cpus) {
         if (tries++ > num_cpus * 5) {
             log_error("Waited for %u CPUs to finish initialization, but timed out", num_cpus);
-            return -PAL_ERROR_DENIED;
+            return PAL_ERROR_DENIED;
         }
         ret = delay(/*delay_us=*/10000UL, /*continue_gate=*/NULL);
         if (ret < 0)

@@ -82,7 +82,7 @@ static int shared_memory_init(uint64_t gpa_width) {
         failed_addr &= ~g_shared_bit; /* MAPGPA returns first failing addr with shared bit set */
         if (!(map_addr <= failed_addr && failed_addr < map_addr + map_size)) {
             /* sanity check, just in case */
-            return -PAL_ERROR_DENIED;
+            return PAL_ERROR_DENIED;
         }
         map_size -= failed_addr - map_addr;
         map_addr = failed_addr;
@@ -102,12 +102,12 @@ static int tsc_frequency_init(void) {
     _PalCpuIdRetrieve(TSC_FREQ_LEAF, 0, words);
     if (!words[CPUID_WORD_EAX] || !words[CPUID_WORD_EBX]) {
         /* Intel TDX guarantees that EAX = 1 and EBX = 0x017D7840; this check is a precaution */
-        return -PAL_ERROR_DENIED;
+        return PAL_ERROR_DENIED;
     }
 
     if (!words[CPUID_WORD_ECX]) {
         /* ECX is taken from host VMM's TSC_FREQUENCY parameter; a benign VMM always sets it */
-        return -PAL_ERROR_DENIED;
+        return PAL_ERROR_DENIED;
     }
 
     /* calculate TSC frequency as core crystal clock frequency (EAX) * EBX / EAX; cast to 64-bit
@@ -164,7 +164,7 @@ static int tdx_extend_rtmr2_with_manifest(const char* manifest, size_t manifest_
     __attribute__((aligned(64))) uint8_t rtmr2_buffer[48] = {0};
 
     if (!manifest_size || manifest[manifest_size] != '\0')
-        return -PAL_ERROR_INVAL;
+        return PAL_ERROR_INVAL;
 
     /* FIXME: replace with SHA384 when our common code exports it (that's what
      *        tdx_tdcall_mr_rtmr_extend API expects) */
@@ -181,7 +181,7 @@ static int tdx_extend_rtmr2_with_manifest(const char* manifest, size_t manifest_
 
     long tdx_ret = tdx_tdcall_mr_rtmr_extend((uint64_t)&rtmr2_buffer, /*rtmr_index=*/2);
     if (tdx_ret)
-        return -PAL_ERROR_DENIED;
+        return PAL_ERROR_DENIED;
 
     return 0;
 }
@@ -414,7 +414,7 @@ noreturn int pal_start_continue(void* cmdline_) {
     char* manifest = NULL;
     size_t manifest_size;
     ret = read_text_file_to_cstr(manifest_path_tdx, &manifest, &manifest_size);
-    if (ret == -PAL_ERROR_STREAMNOTEXIST)
+    if (ret == PAL_ERROR_STREAMNOTEXIST)
         ret = read_text_file_to_cstr(manifest_path_sgx, &manifest, &manifest_size);
     if (ret < 0)
         INIT_FAIL("Reading manifest failed (tried .manifest.tdx and .manifest.sgx extensions)");

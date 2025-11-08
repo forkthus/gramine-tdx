@@ -82,7 +82,7 @@ static int pci_console_bar_alloc(uint32_t bdf, uint8_t bar_id, uint32_t bar_desc
 
     void* ptr = pci_bar_malloc(bdf, bar_id, bar_desc);
     if (!ptr)
-        return -PAL_ERROR_NOMEM;
+        return PAL_ERROR_NOMEM;
 
     g_console_pci_bars[bar_id]     = (uintptr_t)ptr;
     g_console_pci_bars[bar_id + 1] = (uintptr_t)ptr; /* just to make it non-NULL */
@@ -95,7 +95,7 @@ static int pci_fs_bar_alloc(uint32_t bdf, uint8_t bar_id, uint32_t bar_desc) {
 
     void* ptr = pci_bar_malloc(bdf, bar_id, bar_desc);
     if (!ptr)
-        return -PAL_ERROR_NOMEM;
+        return PAL_ERROR_NOMEM;
 
     g_fs_pci_bars[bar_id]     = (uintptr_t)ptr;
     g_fs_pci_bars[bar_id + 1] = (uintptr_t)ptr; /* just to make it non-NULL */
@@ -108,7 +108,7 @@ static int pci_vsock_bar_alloc(uint32_t bdf, uint8_t bar_id, uint32_t bar_desc) 
 
     void* ptr = pci_bar_malloc(bdf, bar_id, bar_desc);
     if (!ptr)
-        return -PAL_ERROR_NOMEM;
+        return PAL_ERROR_NOMEM;
 
     g_vsock_pci_bars[bar_id]     = (uintptr_t)ptr;
     g_vsock_pci_bars[bar_id + 1] = (uintptr_t)ptr; /* just to make it non-NULL */
@@ -143,18 +143,18 @@ static int pci_bar_init_once(uint32_t bdf, uint16_t device_id, uint8_t bar_id) {
     bool bar_io_space = !!(bar_desc & 0x1); /* true - I/O, false - memory */
     if (bar_io_space) {
         /* currently we support only memory-based BARs */
-        return -PAL_ERROR_NOTSUPPORT;
+        return PAL_ERROR_NOTSUPPORT;
     }
 
     uint32_t bar_type = (bar_desc & 0x6) >> 1;
     if (bar_type != 0x2) {
         /* currently we support only 64-bit memory-based BARs */
-        return -PAL_ERROR_NOTSUPPORT;
+        return PAL_ERROR_NOTSUPPORT;
     }
 
     if (bar_id > 4) {
         /* 64-bit addresses consume 2 BARs, so bar_id cannot be larger than 4 at this point */
-        return -PAL_ERROR_DENIED;
+        return PAL_ERROR_DENIED;
     }
 
     switch (device_id) {
@@ -167,7 +167,7 @@ static int pci_bar_init_once(uint32_t bdf, uint16_t device_id, uint8_t bar_id) {
             return pci_vsock_bar_alloc(bdf, bar_id, bar_desc);
     }
 
-    return -PAL_ERROR_NOTSUPPORT;
+    return PAL_ERROR_NOTSUPPORT;
 }
 
 static int pci_dev_init(uint32_t bdf, uint16_t device_id) {
@@ -183,7 +183,7 @@ static int pci_dev_init(uint32_t bdf, uint16_t device_id) {
     /* Capabilities Pointer only used if bit 4 of the Status reg is set to 1 */
     uint16_t status = pci_config_readw(bdf, PCI_STATUS);
     if (!(status & (1 << 4)))
-        return -PAL_ERROR_NOTSUPPORT;
+        return PAL_ERROR_NOTSUPPORT;
 
     uint8_t cap_pointer = pci_config_readb(bdf, PCI_CAP_POINTER);
 
@@ -191,7 +191,7 @@ static int pci_dev_init(uint32_t bdf, uint16_t device_id) {
     while (cap_pointer) {
         if (number_of_caps++ == 256) {
             /* too many capabilities listed, malicious or buggy VMM */
-            return -PAL_ERROR_DENIED;
+            return PAL_ERROR_DENIED;
         }
 
         cap_pointer &= 0xFC; /* bottom two bits are reserved and should be masked */
@@ -209,7 +209,7 @@ static int pci_dev_init(uint32_t bdf, uint16_t device_id) {
         uint8_t cap_len = pci_config_readb(bdf, cap_pointer + 2);
         if (cap_len < virtio_pci_cap_size) {
             /* too small length of the capability struct, malicious or buggy VMM */
-            return -PAL_ERROR_DENIED;
+            return PAL_ERROR_DENIED;
         }
 
         uint8_t cfg_type = pci_config_readb(bdf, cap_pointer + 3);
@@ -225,7 +225,7 @@ static int pci_dev_init(uint32_t bdf, uint16_t device_id) {
 
         if (bar_id > 5) {
             /* BAR may have values 0x0 to 0x5, any other value is reserved */
-            return -PAL_ERROR_DENIED;
+            return PAL_ERROR_DENIED;
         }
 
         if (cfg_type == VIRTIO_PCI_CAP_COMMON_CFG
@@ -240,14 +240,14 @@ static int pci_dev_init(uint32_t bdf, uint16_t device_id) {
         switch (cfg_type) {
             case VIRTIO_PCI_CAP_COMMON_CFG: {
                 if (!IS_ALIGNED(bar_offset, 4))
-                    return -PAL_ERROR_INVAL;
+                    return PAL_ERROR_INVAL;
                 uintptr_t bar_addr = pci_bar_addr(device_id, bar_id);
                 regs = (struct virtio_pci_regs*)(bar_addr + bar_offset);
                 break;
             }
             case VIRTIO_PCI_CAP_NOTIFY_CFG: {
                 if (!IS_ALIGNED(bar_offset, 2))
-                    return -PAL_ERROR_INVAL;
+                    return PAL_ERROR_INVAL;
                 notify_off_addr = pci_bar_addr(device_id, bar_id) + bar_offset;
                 notify_off_multiplier = pci_config_readl(bdf, cap_pointer + virtio_pci_cap_size);
                 break;
@@ -259,7 +259,7 @@ static int pci_dev_init(uint32_t bdf, uint16_t device_id) {
             }
             case VIRTIO_PCI_CAP_DEVICE_CFG: {
                 if (!IS_ALIGNED(bar_offset, 4))
-                    return -PAL_ERROR_INVAL;
+                    return PAL_ERROR_INVAL;
                 uintptr_t bar_addr = pci_bar_addr(device_id, bar_id);
                 device_config = (void*)(bar_addr + bar_offset);
                 break;
@@ -276,28 +276,28 @@ static int pci_dev_init(uint32_t bdf, uint16_t device_id) {
 
     if (notify_off_multiplier != 0 && !IS_POWER_OF_2(notify_off_multiplier)) {
         /* notify_off_multiplier must be even power of 2 or zero */
-        return -PAL_ERROR_INVAL;
+        return PAL_ERROR_INVAL;
     }
 
     if (!(PCI_MMIO_START_ADDR <= (uintptr_t)regs &&
             (uintptr_t)regs + sizeof(*regs) < PCI_MMIO_END_ADDR)) {
         /* incorrect or malicious common configuration structure */
-        return -PAL_ERROR_DENIED;
+        return PAL_ERROR_DENIED;
     }
     if (!(PCI_MMIO_START_ADDR <= (uintptr_t)notify_off_addr &&
             (uintptr_t)notify_off_addr + sizeof(uint16_t) < PCI_MMIO_END_ADDR)) {
         /* incorrect or malicious notify offset addr */
-        return -PAL_ERROR_DENIED;
+        return PAL_ERROR_DENIED;
     }
     if (!(PCI_MMIO_START_ADDR <= (uintptr_t)interrupt_status_reg &&
             (uintptr_t)interrupt_status_reg + sizeof(*interrupt_status_reg) < PCI_MMIO_END_ADDR)) {
         /* incorrect or malicious interrupt (ISR) status register */
-        return -PAL_ERROR_DENIED;
+        return PAL_ERROR_DENIED;
     }
     if (!(PCI_MMIO_START_ADDR <= (uintptr_t)device_config &&
             (uintptr_t)device_config + /*diff devices have diff sizes*/0 < PCI_MMIO_END_ADDR)) {
         /* incorrect or malicious device-specific configuration structure */
-        return -PAL_ERROR_DENIED;
+        return PAL_ERROR_DENIED;
     }
 
     uint16_t command_reg = pci_config_readw(bdf, PCI_COMMAND);
@@ -323,7 +323,7 @@ static int pci_dev_init(uint32_t bdf, uint16_t device_id) {
             return virtio_vsock_init(regs, device_config, notify_off_addr, notify_off_multiplier,
                                      interrupt_status_reg);
         default:
-            return -PAL_ERROR_NOTSUPPORT;
+            return PAL_ERROR_NOTSUPPORT;
     }
 
     return 0;
@@ -358,7 +358,7 @@ static int pci_bus_init(void) {
         if (header_type != 0x0) {
             /* console/fs/vsock virtio device must be a general single-function device (not a
              * multi-function device) */
-            return -PAL_ERROR_NOTSUPPORT;
+            return PAL_ERROR_NOTSUPPORT;
         }
 
         ret = pci_dev_init(bdf, device_id);
@@ -373,7 +373,7 @@ int pci_init(void) {
     uint32_t id = pci_config_readl(/*bdf=*/0, /*addr=*/0);
     if (id != (PCI_VENDOR_ID_INTEL | (PCI_DEVICE_ID_INTEL_Q35_MCH << 16))) {
         /* only support Q35 machine type (default in QEMU) */
-        return -PAL_ERROR_NOTIMPLEMENTED;
+        return PAL_ERROR_NOTIMPLEMENTED;
     }
 
     /*

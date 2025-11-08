@@ -23,7 +23,7 @@ int _PalProcessCreate(const char** args, uintptr_t (*reserved_mem_ranges)[2],
     __UNUSED(reserved_mem_ranges);
     __UNUSED(reserved_mem_ranges_len);
     __UNUSED(out_handle);
-    return -PAL_ERROR_NOTIMPLEMENTED;
+    return PAL_ERROR_NOTIMPLEMENTED;
 }
 
 static int64_t proc_read(PAL_HANDLE handle, uint64_t offset, uint64_t count, void* buffer) {
@@ -31,7 +31,7 @@ static int64_t proc_read(PAL_HANDLE handle, uint64_t offset, uint64_t count, voi
     __UNUSED(offset);
     __UNUSED(count);
     __UNUSED(buffer);
-    return -PAL_ERROR_NOTIMPLEMENTED;
+    return PAL_ERROR_NOTIMPLEMENTED;
 }
 
 static int64_t proc_write(PAL_HANDLE handle, uint64_t offset, uint64_t count, const void* buffer) {
@@ -39,7 +39,7 @@ static int64_t proc_write(PAL_HANDLE handle, uint64_t offset, uint64_t count, co
     __UNUSED(offset);
     __UNUSED(count);
     __UNUSED(buffer);
-    return -PAL_ERROR_NOTIMPLEMENTED;
+    return PAL_ERROR_NOTIMPLEMENTED;
 }
 
 static void proc_destroy(PAL_HANDLE handle) {
@@ -49,19 +49,19 @@ static void proc_destroy(PAL_HANDLE handle) {
 static int proc_delete(PAL_HANDLE handle, enum pal_delete_mode delete_mode) {
     __UNUSED(handle);
     __UNUSED(delete_mode);
-    return -PAL_ERROR_NOTIMPLEMENTED;
+    return PAL_ERROR_NOTIMPLEMENTED;
 }
 
 static int proc_attrquerybyhdl(PAL_HANDLE handle, PAL_STREAM_ATTR* attr) {
     __UNUSED(handle);
     __UNUSED(attr);
-    return -PAL_ERROR_NOTIMPLEMENTED;
+    return PAL_ERROR_NOTIMPLEMENTED;
 }
 
 static int proc_attrsetbyhdl(PAL_HANDLE handle, PAL_STREAM_ATTR* attr) {
     __UNUSED(handle);
     __UNUSED(attr);
-    return -PAL_ERROR_NOTIMPLEMENTED;
+    return PAL_ERROR_NOTIMPLEMENTED;
 }
 
 struct handle_ops g_proc_ops = {

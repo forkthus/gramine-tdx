@@ -50,7 +50,7 @@ int extract_multicore_info_from_hobs(void* hob_list_addr, void** out_mailbox_add
                 if (madt_local_apic->flags & 1) {
                     /* bit 0 (Processor Enabled) is set, can use this CPU */
                     if (apic_ids_idx == apic_ids_max_size)
-                        return -PAL_ERROR_OVERFLOW;
+                        return PAL_ERROR_OVERFLOW;
                     out_apic_ids[apic_ids_idx++] = madt_local_apic->apic_id;
                 }
             }
@@ -61,7 +61,7 @@ int extract_multicore_info_from_hobs(void* hob_list_addr, void** out_mailbox_add
 
                 if (madt_mp_wakeup->length != 16 || madt_mp_wakeup->mailbox_version != 0) {
                     /* sanity checks fail */
-                    return -PAL_ERROR_INVAL;
+                    return PAL_ERROR_INVAL;
                 }
                 *out_mailbox_addr = (void*)madt_mp_wakeup->mailbox_addr;
             }

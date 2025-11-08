@@ -35,7 +35,7 @@ static int pipe_listen(struct pal_handle** handle, const char* name, pal_stream_
 
     struct pal_handle* pipe = calloc(1, sizeof(*pipe));
     if (!pipe)
-        return -PAL_ERROR_NOMEM;
+        return PAL_ERROR_NOMEM;
 
     pipe->hdr.type = PAL_TYPE_PIPESRV;
     pipe->flags = 0; /* cannot read or write on the server pipe */
@@ -47,7 +47,7 @@ static int pipe_listen(struct pal_handle** handle, const char* name, pal_stream_
     struct pal_handle* server_pipe;
     LISTP_FOR_EACH_ENTRY(server_pipe, &g_server_pipes_list, list) {
         if (strcmp(server_pipe->pipe.name, name) == 0) {
-            ret = -PAL_ERROR_STREAMEXIST;
+            ret = PAL_ERROR_STREAMEXIST;
             goto out;
         }
     }
@@ -68,7 +68,7 @@ static int pipe_connect(struct pal_handle** handle, const char* name,
 
     struct pal_handle* pipe = calloc(1, sizeof(*pipe));
     if (!pipe)
-        return -PAL_ERROR_NOMEM;
+        return PAL_ERROR_NOMEM;
 
     pipe->hdr.type = PAL_TYPE_PIPE;
     pipe->flags = PAL_HANDLE_FD_READABLE | PAL_HANDLE_FD_WRITABLE;
@@ -90,7 +90,7 @@ static int pipe_connect(struct pal_handle** handle, const char* name,
     }
 
     if (!found_server_pipe) {
-        ret = -PAL_ERROR_CONNFAILED;
+        ret = PAL_ERROR_CONNFAILED;
         goto out;
     }
 
@@ -117,7 +117,7 @@ int pal_common_pipe_open(struct pal_handle** handle, const char* type, const cha
     assert(create == PAL_CREATE_IGNORED);
 
     if (!WITHIN_MASK(share, PAL_SHARE_MASK) || !WITHIN_MASK(options, PAL_OPTION_MASK))
-        return -PAL_ERROR_INVAL;
+        return PAL_ERROR_INVAL;
 
     if (!strcmp(type, URI_TYPE_PIPE_SRV))
         return pipe_listen(handle, uri, options);
@@ -125,7 +125,7 @@ int pal_common_pipe_open(struct pal_handle** handle, const char* type, const cha
     if (!strcmp(type, URI_TYPE_PIPE))
         return pipe_connect(handle, uri, options);
 
-    return -PAL_ERROR_INVAL;
+    return PAL_ERROR_INVAL;
 }
 
 int pal_common_pipe_waitforclient(struct pal_handle* server, struct pal_handle** client,
@@ -133,16 +133,16 @@ int pal_common_pipe_waitforclient(struct pal_handle* server, struct pal_handle**
     int ret;
 
     if (server->hdr.type != PAL_TYPE_PIPESRV)
-        return -PAL_ERROR_NOTSERVER;
+        return PAL_ERROR_NOTSERVER;
 
     struct pal_handle_inner_pipe_buf* pipe_buf = calloc(1, sizeof(*pipe_buf) + PIPE_BUF_SIZE);
     if (!pipe_buf)
-        return -PAL_ERROR_NOMEM;
+        return PAL_ERROR_NOMEM;
 
     struct pal_handle* pipe = calloc(1, sizeof(*pipe));
     if (!pipe) {
         free(pipe_buf);
-        return -PAL_ERROR_NOMEM;
+        return PAL_ERROR_NOMEM;
     }
 
     pipe->hdr.type = PAL_TYPE_PIPECLI;
@@ -170,7 +170,7 @@ int pal_common_pipe_waitforclient(struct pal_handle* server, struct pal_handle**
 
         if (!found_connecting_pipe) {
             if (server->pipe.nonblocking) {
-                ret = -PAL_ERROR_TRYAGAIN;
+                ret = PAL_ERROR_TRYAGAIN;
                 goto out;
             }
             sched_thread_wait(&server->pipe.connect_futex, &g_connecting_pipes_lock);
@@ -201,20 +201,20 @@ int64_t pal_common_pipe_read(struct pal_handle* handle, uint64_t offset, uint64_
     char* buf = buffer;
 
     if (offset)
-        return -PAL_ERROR_INVAL;
+        return PAL_ERROR_INVAL;
 
     if (handle->hdr.type != PAL_TYPE_PIPECLI && handle->hdr.type != PAL_TYPE_PIPE)
-        return -PAL_ERROR_NOTCONNECTION;
+        return PAL_ERROR_NOTCONNECTION;
 
     if (!(handle->flags & PAL_HANDLE_FD_READABLE))
-        return -PAL_ERROR_INVAL;
+        return PAL_ERROR_INVAL;
 
     spinlock_lock(&g_connecting_pipes_lock);
     struct pal_handle_inner_pipe_buf* pipe_buf = handle->pipe.pipe_buf;
     spinlock_unlock(&g_connecting_pipes_lock);
 
     if (!pipe_buf)
-        return -PAL_ERROR_NOTCONNECTION;
+        return PAL_ERROR_NOTCONNECTION;
 
     spinlock_lock(&pipe_buf->lock);
 
@@ -226,7 +226,7 @@ int64_t pal_common_pipe_read(struct pal_handle* handle, uint64_t offset, uint64_
         }
 
         if (handle->pipe.nonblocking) {
-            bytes = -PAL_ERROR_TRYAGAIN;
+            bytes = PAL_ERROR_TRYAGAIN;
             goto out;
         }
 
@@ -263,20 +263,20 @@ int64_t pal_common_pipe_write(struct pal_handle* handle, uint64_t offset, uint64
     const char* buf = buffer;
 
     if (offset)
-        return -PAL_ERROR_INVAL;
+        return PAL_ERROR_INVAL;
 
     if (handle->hdr.type != PAL_TYPE_PIPECLI && handle->hdr.type != PAL_TYPE_PIPE)
-        return -PAL_ERROR_NOTCONNECTION;
+        return PAL_ERROR_NOTCONNECTION;
 
     if (!(handle->flags & PAL_HANDLE_FD_WRITABLE))
-        return -PAL_ERROR_INVAL;
+        return PAL_ERROR_INVAL;
 
     spinlock_lock(&g_connecting_pipes_lock);
     struct pal_handle_inner_pipe_buf* pipe_buf = handle->pipe.pipe_buf;
     spinlock_unlock(&g_connecting_pipes_lock);
 
     if (!pipe_buf)
-        return -PAL_ERROR_NOTCONNECTION;
+        return PAL_ERROR_NOTCONNECTION;
 
     spinlock_lock(&pipe_buf->lock);
 
@@ -286,13 +286,13 @@ int64_t pal_common_pipe_write(struct pal_handle* handle, uint64_t offset, uint64
         while (pipe_buf->write_pos - pipe_buf->read_pos == PIPE_BUF_SIZE) {
             if (!pipe_buf->readable) {
                 /* pipe was closed for read, this write must fail */
-                bytes = -PAL_ERROR_CONNFAILED_PIPE;
+                bytes = PAL_ERROR_CONNFAILED_PIPE;
                 goto out;
             }
 
             if (handle->pipe.nonblocking) {
                 if (!bytes)
-                    bytes = -PAL_ERROR_TRYAGAIN;
+                    bytes = PAL_ERROR_TRYAGAIN;
                 goto out;
             }
 
@@ -397,7 +397,7 @@ int pal_common_pipe_delete(struct pal_handle* handle, enum pal_delete_mode delet
             handle->flags &= ~PAL_HANDLE_FD_WRITABLE;
             break;
         default:
-            return -PAL_ERROR_INVAL;
+            return PAL_ERROR_INVAL;
     }
 
     struct pal_handle_inner_pipe_buf* pipe_buf = NULL;

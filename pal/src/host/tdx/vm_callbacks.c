@@ -432,10 +432,9 @@ int vm_virtualization_exception(struct isr_regs* regs) {
                 regs->rip += vmexit_instr_length;
                 return 0;
             }
-            return -PAL_ERROR_DENIED;
-
+            return PAL_ERROR_DENIED;
         default: /* unsupported exit reason */
-            return -PAL_ERROR_DENIED;
+            return PAL_ERROR_DENIED;
     }
 
     return 0;

@@ -109,12 +109,12 @@ static int virtio_fs_exec_request(size_t count, struct virtio_fs_desc* descs) {
     /* sanity check: FS requests can be issued only after a (single) FUSE_INIT request */
     if (hdr_in->opcode == FUSE_INIT) {
         if (g_fs->initialized) {
-            ret = -PAL_ERROR_DENIED;
+            ret = PAL_ERROR_DENIED;
             goto out;
         }
     } else {
         if (!g_fs->initialized) {
-            ret = -PAL_ERROR_DENIED;
+            ret = PAL_ERROR_DENIED;
             goto out;
         }
     }
@@ -130,7 +130,7 @@ static int virtio_fs_exec_request(size_t count, struct virtio_fs_desc* descs) {
 
     if (total_in_size + total_out_size > VIRTIO_FS_SHARED_BUF_SIZE) {
         /* FS request doesn't fit into shared buffer, cannot send it */
-        ret = -PAL_ERROR_NOMEM;
+        ret = PAL_ERROR_NOMEM;
         goto out;
     }
 
@@ -224,13 +224,13 @@ int virtio_fs_fuse_init(void) {
         return unix_to_pal_error(hdr_out.error);
 
     if (init_in.major != init_out.major)
-        return -PAL_ERROR_DENIED;
+        return PAL_ERROR_DENIED;
 
     if (init_out.minor < 9) {
         /* to avoid subtle issues with legacy FUSE struct layouts, we need at least v7.9;
          * for one example of subtle issues, search for `FUSE_COMPAT_WRITE_IN_SIZE` in
          * https://www.mail-archive.com/git-commits-head@vger.kernel.org/msg27852.html */
-        return -PAL_ERROR_DENIED;
+        return PAL_ERROR_DENIED;
     }
 
     /* NOTE: no fields in `fuse_init_out` (like `max_readahead`, `flags`) seem to be interesting */
@@ -242,13 +242,13 @@ int virtio_fs_fuse_lookup(const char* filename, uint64_t* out_nodeid) {
     int ret;
 
     if (strlen(filename) == 0)
-        return -PAL_ERROR_DENIED;
+        return PAL_ERROR_DENIED;
 
     /* lookup is always started at root dir, so filename should be absolute */
     char* abs_filename = filename[0] == '/' ? strdup(filename)
                                             : alloc_concat3(g_host_pwd, -1, "/", 1, filename, -1);
     if (!abs_filename)
-        return -PAL_ERROR_NOMEM;
+        return PAL_ERROR_NOMEM;
 
     struct fuse_in_header  hdr_in    = { .opcode = FUSE_LOOKUP, .nodeid = FUSE_ROOT_ID };
     struct fuse_out_header hdr_out   = {0};
@@ -292,7 +292,7 @@ int virtio_fs_fuse_readlink(uint64_t nodeid, uint64_t size, char* out_buf, uint6
     /* for security and not to modify `out_buf` in case of errors, introduce a bounce buffer */
     char* bounce_buf = malloc(size);
     if (!bounce_buf)
-        return -PAL_ERROR_NOMEM;
+        return PAL_ERROR_NOMEM;
 
     struct virtio_fs_desc descs[] = {
         { .addr = &hdr_in,    .size = sizeof(hdr_in),  .in = true },
@@ -311,7 +311,7 @@ int virtio_fs_fuse_readlink(uint64_t nodeid, uint64_t size, char* out_buf, uint6
     /* verify possibly-malicious `hdr_out.len` (recall that `hdr_out->len` returns the *total* size
      * of the host's reply, including the header) */
     if (hdr_out.len < sizeof(hdr_out) || hdr_out.len > sizeof(hdr_out) + size) {
-        ret = -PAL_ERROR_DENIED;
+        ret = PAL_ERROR_DENIED;
         goto out;
     }
 
@@ -494,7 +494,7 @@ int virtio_fs_fuse_read(uint64_t nodeid, uint64_t fh, uint64_t size, uint64_t of
     /* verify possibly-malicious `hdr_out.len` (recall that `hdr_out->len` returns the *total* size
      * of the host's reply, including the header) */
     if (hdr_out.len < sizeof(hdr_out) || hdr_out.len > sizeof(hdr_out) + size) {
-        ret = -PAL_ERROR_DENIED;
+        ret = PAL_ERROR_DENIED;
         goto fail;
     }
 
@@ -534,7 +534,7 @@ int virtio_fs_fuse_write(uint64_t nodeid, uint64_t fh, const char* buf, uint64_t
 
     /* verify possibly-malicious `write_out.size` */
     if (write_out.size > size)
-        return -PAL_ERROR_DENIED;
+        return PAL_ERROR_DENIED;
 
     *out_size = write_out.size;
     return 0;
@@ -604,7 +604,7 @@ int virtio_fs_fuse_getattr(uint64_t nodeid, uint64_t fh, uint32_t flags, uint64_
 
     /* verify queried file size against a caller-specified limit */
     if (attr_out.attr.size > max_size)
-        return -PAL_ERROR_DENIED;
+        return PAL_ERROR_DENIED;
 
     /* we currently support only regular files and dirs */
     if (!S_ISREG(attr_out.attr.mode) && !S_ISDIR(attr_out.attr.mode))
@@ -621,7 +621,7 @@ int virtio_fs_fuse_setattr(uint64_t nodeid, const struct fuse_setattr_in* setatt
     /* the only currently used fields are `size` and `mode`, set on a file handle */
     if (setattr->valid != (FATTR_FH | FATTR_SIZE)
             && setattr->valid != (FATTR_FH | FATTR_MODE))
-        return -PAL_ERROR_INVAL;
+        return PAL_ERROR_INVAL;
 
     struct fuse_in_header  hdr_in     = { .opcode = FUSE_SETATTR, .nodeid = nodeid };
     struct fuse_setattr_in setattr_in = *setattr;
@@ -769,7 +769,7 @@ int virtio_fs_fuse_readdir(uint64_t nodeid, uint64_t fh, uint64_t size, uint64_t
     /* verify possibly-malicious `hdr_out.len` (recall that `hdr_out->len` returns the *total* size
      * of the host's reply, including the header) */
     if (hdr_out.len < sizeof(hdr_out) || hdr_out.len > sizeof(hdr_out) + size) {
-        ret = -PAL_ERROR_DENIED;
+        ret = PAL_ERROR_DENIED;
         goto fail;
     }
 
@@ -806,7 +806,7 @@ static int virtio_fs_negotiate_features(struct virtio_fs* fs) {
     advertised_features = vm_mmio_readl(&pci_regs->device_feature);
 
     if (!(advertised_features & (1 << VIRTIO_F_VERSION_1)))
-        return -PAL_ERROR_DENIED;
+        return PAL_ERROR_DENIED;
 
     understood_features = 1 << VIRTIO_F_VERSION_1;
 
@@ -825,12 +825,12 @@ static int virtio_fs_alloc(struct virtio_fs** out_fs) {
 
     fs = malloc(sizeof(*fs));
     if (!fs)
-        return -PAL_ERROR_NOMEM;
+        return PAL_ERROR_NOMEM;
     memset(fs, 0, sizeof(*fs)); /* for sanity */
 
     shared_buf = memory_get_shared_region(VIRTIO_FS_SHARED_BUF_SIZE);
     if (!shared_buf) {
-        ret = -PAL_ERROR_NOMEM;
+        ret = PAL_ERROR_NOMEM;
         goto fail;
     }
 
@@ -897,7 +897,7 @@ int virtio_fs_init(struct virtio_pci_regs* pci_regs, struct virtio_fs_config* pc
     status = vm_mmio_readb(&pci_regs->device_status);
     if (!(status & VIRTIO_STATUS_FEATURES_OK)) {
         /* host device (vhost-fs or virtiofsd) did not accept our features */
-        ret = -PAL_ERROR_DENIED;
+        ret = PAL_ERROR_DENIED;
         goto fail;
     }
 
@@ -926,7 +926,7 @@ int virtio_fs_init(struct virtio_pci_regs* pci_regs, struct virtio_fs_config* pc
     if (!(PCI_MMIO_START_ADDR <= (uintptr_t)fs->requests_notify_addr &&
                 (uintptr_t)fs->requests_notify_addr + notify_addr_size < PCI_MMIO_END_ADDR)) {
         /* incorrect or malicious queue notify addr */
-        ret = -PAL_ERROR_DENIED;
+        ret = PAL_ERROR_DENIED;
         goto fail;
     }
 

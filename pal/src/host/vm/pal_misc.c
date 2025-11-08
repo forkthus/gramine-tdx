@@ -47,7 +47,7 @@ int _PalAttestationReport(const void* user_report_data, size_t* user_report_data
     __UNUSED(target_info_size);
     __UNUSED(report);
     __UNUSED(report_size);
-    return -PAL_ERROR_NOTIMPLEMENTED;
+    return PAL_ERROR_NOTIMPLEMENTED;
 }
 
 int _PalAttestationQuote(const void* user_report_data, size_t user_report_data_size, void* quote,
@@ -56,7 +56,7 @@ int _PalAttestationQuote(const void* user_report_data, size_t user_report_data_s
     __UNUSED(user_report_data_size);
     __UNUSED(quote);
     __UNUSED(quote_size);
-    return -PAL_ERROR_NOTIMPLEMENTED;
+    return PAL_ERROR_NOTIMPLEMENTED;
 }
 
 int _PalGetSpecialKey(const char* name, void* key, size_t* key_size) {

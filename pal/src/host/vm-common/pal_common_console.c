@@ -38,14 +38,14 @@ int pal_common_console_open(struct pal_handle** handle, const char* type, const 
     __UNUSED(options);
 
     if (strcmp(type, URI_TYPE_CONSOLE))
-        return -PAL_ERROR_INVAL;
+        return PAL_ERROR_INVAL;
 
     if (access != PAL_ACCESS_RDONLY && access != PAL_ACCESS_WRONLY)
-        return -PAL_ERROR_INVAL;
+        return PAL_ERROR_INVAL;
 
     struct pal_handle* hdl = calloc(1, sizeof(*hdl));
     if (!hdl)
-        return -PAL_ERROR_NOMEM;
+        return PAL_ERROR_NOMEM;
 
     hdl->hdr.type = PAL_TYPE_CONSOLE;
     spinlock_init(&hdl->console.lock);
@@ -62,10 +62,10 @@ int64_t pal_common_console_read(struct pal_handle* handle, uint64_t offset, uint
     assert(handle->hdr.type == PAL_TYPE_CONSOLE);
 
     if (offset)
-        return -PAL_ERROR_INVAL;
+        return PAL_ERROR_INVAL;
 
     if (!(handle->flags & PAL_HANDLE_FD_READABLE))
-        return -PAL_ERROR_DENIED;
+        return PAL_ERROR_DENIED;
 
     spinlock_lock(&handle->console.lock);
 
@@ -73,7 +73,7 @@ int64_t pal_common_console_read(struct pal_handle* handle, uint64_t offset, uint
     while (true) {
         bytes = virtio_console_read(buffer, size);
         if (bytes < 0) {
-            if (bytes == -PAL_ERROR_TRYAGAIN) {
+            if (bytes == PAL_ERROR_TRYAGAIN) {
                 sched_thread_wait(&g_console_reader_futex, &handle->console.lock);
                 continue;
             }
@@ -90,19 +90,19 @@ int64_t pal_common_console_write(struct pal_handle* handle, uint64_t offset, uin
     assert(handle->hdr.type == PAL_TYPE_CONSOLE);
 
     if (offset)
-        return -PAL_ERROR_INVAL;
+        return PAL_ERROR_INVAL;
 
     if (!(handle->flags & PAL_HANDLE_FD_WRITABLE))
-        return -PAL_ERROR_DENIED;
+        return PAL_ERROR_DENIED;
 
     uint64_t written = 0;
     while (written < size) {
         uint64_t to_write = MIN(size - written, CONSOLE_OUT_CHUNK_SIZE);
         int ret = virtio_console_nprint(buffer + written, to_write);
         if (ret < 0) {
-            if (ret == -PAL_ERROR_TRYAGAIN)
+            if (ret == PAL_ERROR_TRYAGAIN)
                 continue;
-            if (ret == -PAL_ERROR_NOMEM) {
+            if (ret == PAL_ERROR_NOMEM) {
                 /* this error means that we exceed the total capacity of virtio console buffer;
                  * if this happens then our CONSOLE_OUT_CHUNK_SIZE is too big */
                 BUG();
@@ -124,7 +124,7 @@ int pal_common_console_flush(struct pal_handle* handle) {
     assert(handle->hdr.type == PAL_TYPE_CONSOLE);
 
     if (!(handle->flags & PAL_HANDLE_FD_WRITABLE))
-        return -PAL_ERROR_DENIED;
+        return PAL_ERROR_DENIED;
 
     return 0; /* no-op */
 }

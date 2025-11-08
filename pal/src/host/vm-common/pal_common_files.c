@@ -33,7 +33,7 @@ static int extract_dir_and_base(const char* orig_path, char** out_modified_path,
     char* modified_path = *orig_path == '/' ? strdup(orig_path)
                                             : alloc_concat("./", -1, orig_path, -1);
     if (!modified_path)
-        return -PAL_ERROR_NOMEM;
+        return PAL_ERROR_NOMEM;
 
     /* first remove trailing `/` symbols, then find the last `/` delimeter between dir and base */
     size_t len = strlen(modified_path);
@@ -56,7 +56,7 @@ static int extract_dir_and_base(const char* orig_path, char** out_modified_path,
     }
 
     free(modified_path);
-    return -PAL_ERROR_INVAL;
+    return PAL_ERROR_INVAL;
 }
 
 static int file_or_dir_rename(const char* old, const char* new) {
@@ -127,7 +127,7 @@ int pal_common_file_open(struct pal_handle** handle, const char* type, const cha
     char* created_base_path = NULL;
 
     if (strcmp(type, URI_TYPE_FILE))
-        return -PAL_ERROR_INVAL;
+        return PAL_ERROR_INVAL;
 
     assert(create != PAL_CREATE_IGNORED);
     assert(WITHIN_MASK(share,   PAL_SHARE_MASK));
@@ -137,7 +137,7 @@ int pal_common_file_open(struct pal_handle** handle, const char* type, const cha
 
     /* resolve symlinks in provided uri (virtiofs on the host doesn't do it, so we must) */
     ret = realpath(uri, /*got_path=*/NULL, &resolved_path);
-    if (ret == -PAL_ERROR_STREAMNOTEXIST)
+    if (ret == PAL_ERROR_STREAMNOTEXIST)
         file_exists = false;
     else if (ret >= 0)
         file_exists = true;
@@ -145,10 +145,10 @@ int pal_common_file_open(struct pal_handle** handle, const char* type, const cha
         return ret;
 
     if (!file_exists && create == PAL_CREATE_NEVER)
-        return -PAL_ERROR_STREAMNOTEXIST;
+        return PAL_ERROR_STREAMNOTEXIST;
 
     if (file_exists && create == PAL_CREATE_ALWAYS)
-        return -PAL_ERROR_STREAMEXIST;
+        return PAL_ERROR_STREAMEXIST;
 
     if (!file_exists) {
         /* file doesn't exist and we should create it in corresponding dir */
@@ -197,19 +197,19 @@ int pal_common_file_open(struct pal_handle** handle, const char* type, const cha
 
     hdl = calloc(1, sizeof(*hdl));
     if (!hdl) {
-        ret = -PAL_ERROR_NOMEM;
+        ret = PAL_ERROR_NOMEM;
         goto out;
     }
 
     size_t norm_path_size = strlen(uri) + 1;
     norm_path = malloc(norm_path_size);
     if (!norm_path) {
-        ret = -PAL_ERROR_NOMEM;
+        ret = PAL_ERROR_NOMEM;
         goto out;
     }
 
     if (!get_norm_path(uri, norm_path, &norm_path_size)) {
-        ret = -PAL_ERROR_INVAL;
+        ret = PAL_ERROR_INVAL;
         goto out;
     }
 
@@ -296,7 +296,7 @@ int64_t pal_common_file_read(struct pal_handle* handle, uint64_t offset, uint64_
                                       offset + total_read_size, buffer + total_read_size,
                                       &read_size);
             if (ret < 0) {
-                if (ret == -PAL_ERROR_INTERRUPTED)
+                if (ret == PAL_ERROR_INTERRUPTED)
                     continue;
                 return total_read_size ? (int64_t)total_read_size : ret;
             }
@@ -332,7 +332,7 @@ int64_t pal_common_file_write(struct pal_handle* handle, uint64_t offset, uint64
     if (handle->file.chunk_hashes) {
         /* case of trusted file: disallow writing completely */
         log_warning("Writing to a trusted file (%s) is disallowed!", handle->file.realpath);
-        return -PAL_ERROR_DENIED;
+        return PAL_ERROR_DENIED;
     }
 
     /* try to write the whole buffer (this is important for some workloads like Python3); do it in
@@ -377,7 +377,7 @@ int pal_common_file_map(struct pal_handle* handle, void* addr, pal_prot_flags_t 
 
     if (!(prot & PAL_PROT_WRITECOPY) && (prot & PAL_PROT_WRITE)) {
         log_warning("App tries to create a writable shared file mapping. This is impossible.");
-        return -PAL_ERROR_DENIED;
+        return PAL_ERROR_DENIED;
     }
 
     /* note that we need to first mmap with write permission (to update the mem region with file
@@ -468,7 +468,7 @@ int pal_common_file_attrquerybyhdl(struct pal_handle* handle, PAL_STREAM_ATTR* p
 
 int pal_common_file_attrquery(const char* type, const char* uri, PAL_STREAM_ATTR* pal_attr) {
     if (strcmp(type, URI_TYPE_FILE) && strcmp(type, URI_TYPE_DIR))
-        return -PAL_ERROR_INVAL;
+        return PAL_ERROR_INVAL;
 
     int ret;
 
@@ -497,7 +497,7 @@ int pal_common_file_delete(struct pal_handle* handle, enum pal_delete_mode delet
     char* resolved_path = NULL;
 
     if (delete_mode != PAL_DELETE_ALL)
-        return -PAL_ERROR_INVAL;
+        return PAL_ERROR_INVAL;
 
     char* base_path = NULL;
     char* dir_path = NULL;
@@ -527,11 +527,11 @@ out:
 
 int pal_common_file_rename(struct pal_handle* handle, const char* type, const char* uri) {
     if (strcmp(type, URI_TYPE_FILE))
-        return -PAL_ERROR_INVAL;
+        return PAL_ERROR_INVAL;
 
     char* tmp = strdup(uri);
     if (!tmp)
-        return -PAL_ERROR_NOMEM;
+        return PAL_ERROR_NOMEM;
 
     int ret = file_or_dir_rename(handle->file.realpath, uri);
     if (ret < 0) {
@@ -564,7 +564,7 @@ int pal_common_dir_open(struct pal_handle** handle, const char* type, const char
     char* created_base_path = NULL;
 
     if (strcmp(type, URI_TYPE_DIR))
-        return -PAL_ERROR_INVAL;
+        return PAL_ERROR_INVAL;
 
     assert(create != PAL_CREATE_IGNORED);
 
@@ -572,7 +572,7 @@ int pal_common_dir_open(struct pal_handle** handle, const char* type, const char
 
     /* resolve symlinks in provided uri (virtiofs on the host doesn't do it, so we must) */
     ret = realpath(uri, /*got_path=*/NULL, &resolved_path);
-    if (ret == -PAL_ERROR_STREAMNOTEXIST)
+    if (ret == PAL_ERROR_STREAMNOTEXIST)
         dir_exists = false;
     else if (ret >= 0)
         dir_exists = true;
@@ -580,10 +580,10 @@ int pal_common_dir_open(struct pal_handle** handle, const char* type, const char
         return ret;
 
     if (!dir_exists && create == PAL_CREATE_NEVER)
-        return -PAL_ERROR_STREAMNOTEXIST;
+        return PAL_ERROR_STREAMNOTEXIST;
 
     if (dir_exists && create == PAL_CREATE_ALWAYS)
-        return -PAL_ERROR_STREAMEXIST;
+        return PAL_ERROR_STREAMEXIST;
 
     if (!dir_exists) {
         /* dir doesn't exist and we should create it in corresponding parent dir */
@@ -624,19 +624,19 @@ int pal_common_dir_open(struct pal_handle** handle, const char* type, const char
 
     hdl = calloc(1, sizeof(*hdl));
     if (!hdl) {
-        ret = -PAL_ERROR_NOMEM;
+        ret = PAL_ERROR_NOMEM;
         goto out;
     }
 
     size_t norm_path_size = strlen(uri) + 1;
     norm_path = malloc(norm_path_size);
     if (!norm_path) {
-        ret = -PAL_ERROR_NOMEM;
+        ret = PAL_ERROR_NOMEM;
         goto out;
     }
 
     if (!get_norm_path(uri, norm_path, &norm_path_size)) {
-        ret = -PAL_ERROR_INVAL;
+        ret = PAL_ERROR_INVAL;
         goto out;
     }
 
@@ -678,7 +678,7 @@ int64_t pal_common_dir_read(struct pal_handle* handle, uint64_t offset, size_t c
     uint64_t last_fuse_dirent_off = 0;
 
     if (offset)
-        return -PAL_ERROR_INVAL;
+        return PAL_ERROR_INVAL;
 
     if (handle->dir.endofstream)
         return 0;
@@ -693,7 +693,7 @@ int64_t pal_common_dir_read(struct pal_handle* handle, uint64_t offset, size_t c
             bool is_dir = dirent->type == DT_DIR;
             size_t len = dirent->namelen;
             if ((ssize_t)len >= (char*)handle->dir.end - (char*)handle->dir.ptr)
-                return -PAL_ERROR_DENIED;
+                return PAL_ERROR_DENIED;
 
             if (len + 1 + (is_dir ? 1 : 0) > count)
                 goto out;
@@ -723,7 +723,7 @@ int64_t pal_common_dir_read(struct pal_handle* handle, uint64_t offset, size_t c
         if (!handle->dir.buf) {
             handle->dir.buf = malloc(DIRBUF_SIZE);
             if (!handle->dir.buf)
-                return -PAL_ERROR_NOMEM;
+                return PAL_ERROR_NOMEM;
         }
 
         uint64_t size;
@@ -771,7 +771,7 @@ int pal_common_dir_delete(struct pal_handle* handle, enum pal_delete_mode delete
     char* resolved_path = NULL;
 
     if (delete_mode != PAL_DELETE_ALL)
-        return -PAL_ERROR_INVAL;
+        return PAL_ERROR_INVAL;
 
     char* base_path = NULL;
     char* dir_path = NULL;
@@ -801,11 +801,11 @@ out:
 
 int pal_common_dir_rename(struct pal_handle* handle, const char* type, const char* uri) {
     if (strcmp(type, URI_TYPE_DIR))
-        return -PAL_ERROR_INVAL;
+        return PAL_ERROR_INVAL;
 
     char* tmp = strdup(uri);
     if (!tmp)
-        return -PAL_ERROR_NOMEM;
+        return PAL_ERROR_NOMEM;
 
     int ret = file_or_dir_rename(handle->dir.realpath, uri);
     if (ret < 0) {

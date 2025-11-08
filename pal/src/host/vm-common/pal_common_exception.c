@@ -74,11 +74,11 @@ static void pal_context_to_isr_regs(struct isr_regs* regs, PAL_CONTEXT* context)
 int pal_common_perform_memfault_handling(uint64_t faulted_addr, struct isr_regs* regs) {
     pal_event_handler_t upcall = _PalGetExceptionHandler(PAL_EVENT_MEMFAULT);
     if (!upcall)
-        return -PAL_ERROR_DENIED;
+        return PAL_ERROR_DENIED;
 
     struct pal_tcb_vm* curr_tcb = (struct pal_tcb_vm*)pal_get_tcb();
     if (!curr_tcb)
-        return -PAL_ERROR_DENIED;
+        return PAL_ERROR_DENIED;
 
     /* RIP in the isr_regs is the actual user RIP */
     curr_tcb->kernel_thread.context.user_rip = regs->rip;

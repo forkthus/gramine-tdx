@@ -56,7 +56,7 @@ int _PalAttestationReport(const void* user_report_data, size_t* user_report_data
     if (!user_report_data_size || !target_info_size || !report_size) {
         /* note that target_info is unused in TDX, but for uniformity with SGX, we require
          * target_info_size pointer to exist */
-        return -PAL_ERROR_INVAL;
+        return PAL_ERROR_INVAL;
     }
 
     if (*user_report_data_size != sizeof(stack_report_data)
@@ -79,7 +79,7 @@ int _PalAttestationReport(const void* user_report_data, size_t* user_report_data
     } while (tdx_ret >> 32 == TDX_OPERAND_BUSY);
 
     if (tdx_ret >> 32 != TDX_SUCCESS)
-        return (tdx_ret >> 32 == TDX_OPERAND_INVALID) ? -PAL_ERROR_INVAL : -PAL_ERROR_DENIED;
+        return (tdx_ret >> 32 == TDX_OPERAND_INVALID) ? PAL_ERROR_INVAL : PAL_ERROR_DENIED;
 
     if (target_info) {
         memcpy(target_info, TDX_TARGET_INFO_DUMMY, sizeof(TDX_TARGET_INFO_DUMMY));
@@ -108,7 +108,7 @@ int _PalAttestationQuote(const void* user_report_data, size_t user_report_data_s
     qgs_msg_get_quote_resp_t* quote_resp = NULL;
 
     if (!quote_size || user_report_data_size != 64)
-        return -PAL_ERROR_INVAL;
+        return PAL_ERROR_INVAL;
 
     __attribute__((aligned(1024))) struct tdx_tdreport_struct stack_report;
 
@@ -127,7 +127,7 @@ int _PalAttestationQuote(const void* user_report_data, size_t user_report_data_s
         /* allocate shared memory for TDX quote once and re-use it afterwards */
         g_shared_mem_for_quote = memory_get_shared_region(g_shared_mem_size_for_quote);
         if (!g_shared_mem_for_quote) {
-            ret = -PAL_ERROR_NOMEM;
+            ret = PAL_ERROR_NOMEM;
             goto out;
         }
     }
@@ -140,7 +140,7 @@ int _PalAttestationQuote(const void* user_report_data, size_t user_report_data_s
     size_t quote_req_size = sizeof(qgs_msg_get_quote_req_t) + sizeof(stack_report);
     quote_req = malloc(quote_req_size);
     if (!quote_req) {
-        ret = -PAL_ERROR_NOMEM;
+        ret = PAL_ERROR_NOMEM;
         goto out;
     }
 
@@ -169,7 +169,7 @@ int _PalAttestationQuote(const void* user_report_data, size_t user_report_data_s
     } while (tdx_ret == TDG_VP_VMCALL_STATUS_RETRY);
 
     if (tdx_ret != TDG_VP_VMCALL_STATUS_SUCCESS) {
-        ret = -PAL_ERROR_INVAL;
+        ret = PAL_ERROR_INVAL;
         goto out;
     }
 
@@ -182,14 +182,14 @@ int _PalAttestationQuote(const void* user_report_data, size_t user_report_data_s
     } while (vmm_reports_status == TDX_GET_QUOTE_STATUS_IN_FLIGHT);
 
     if (vmm_reports_status != TDX_GET_QUOTE_STATUS_SUCCESS) {
-        ret = -PAL_ERROR_INVAL;
+        ret = PAL_ERROR_INVAL;
         goto out;
     }
 
     size_t output_size = vm_shared_readl(&tdx_quote->output_size);
     if (output_size > g_shared_mem_size_for_quote - offsetof(struct tdx_get_quote_format, data)) {
         /* maliciously large size */
-        ret = -PAL_ERROR_DENIED;
+        ret = PAL_ERROR_DENIED;
         goto out;
     }
 
@@ -198,18 +198,18 @@ int _PalAttestationQuote(const void* user_report_data, size_t user_report_data_s
     if (quote_resp_size > g_shared_mem_size_for_quote - offsetof(struct tdx_get_quote_format, data)
             - TDX_GET_QUOTE_DATA_HEADER_SIZE) {
         /* maliciously large size */
-        ret = -PAL_ERROR_DENIED;
+        ret = PAL_ERROR_DENIED;
         goto out;
     }
     if (quote_resp_size < sizeof(qgs_msg_get_quote_resp_t)) {
         /* maliciously small size */
-        ret = -PAL_ERROR_DENIED;
+        ret = PAL_ERROR_DENIED;
         goto out;
     }
 
     quote_resp = malloc(quote_resp_size);
     if (!quote_resp) {
-        ret = -PAL_ERROR_NOMEM;
+        ret = PAL_ERROR_NOMEM;
         goto out;
     }
 
@@ -219,7 +219,7 @@ int _PalAttestationQuote(const void* user_report_data, size_t user_report_data_s
     if (quote_resp->header.major_version != QGS_MSG_LIB_MAJOR_VER ||
             quote_resp->header.type != GET_QUOTE_RESP ||
             quote_resp->header.size != quote_resp_size) {
-        ret = -PAL_ERROR_DENIED;
+        ret = PAL_ERROR_DENIED;
         goto out;
     }
 
@@ -228,17 +228,17 @@ int _PalAttestationQuote(const void* user_report_data, size_t user_report_data_s
                     quote_resp->header.error_code);
         switch (quote_resp->header.error_code) {
             case QGS_MSG_ERROR_OUT_OF_MEMORY:
-                ret = -PAL_ERROR_NOMEM;
+                ret = PAL_ERROR_NOMEM;
                 goto out;
             case QGS_MSG_ERROR_INVALID_PARAMETER:
             case QGS_MSG_ERROR_INVALID_VERSION:
             case QGS_MSG_ERROR_INVALID_TYPE:
             case QGS_MSG_ERROR_INVALID_SIZE:
             case QGS_MSG_ERROR_INVALID_CODE:
-                ret = -PAL_ERROR_INVAL;
+                ret = PAL_ERROR_INVAL;
                 goto out;
             default:
-                ret = -PAL_ERROR_DENIED;
+                ret = PAL_ERROR_DENIED;
                 goto out;
         }
     }
@@ -247,13 +247,13 @@ int _PalAttestationQuote(const void* user_report_data, size_t user_report_data_s
     if (quote_resp->selected_id_size > max_id_quote_size ||
             quote_resp->quote_size > max_id_quote_size ||
             (quote_resp->selected_id_size + quote_resp->quote_size) > max_id_quote_size) {
-        ret = -PAL_ERROR_DENIED;
+        ret = PAL_ERROR_DENIED;
         goto out;
     }
 
     if (*quote_size < quote_resp->quote_size) {
         *quote_size = quote_resp->quote_size;
-        ret = -PAL_ERROR_NOMEM;
+        ret = PAL_ERROR_NOMEM;
         goto out;
     }
 
@@ -277,5 +277,5 @@ int _PalGetSpecialKey(const char* name, void* key, size_t* key_size) {
     __UNUSED(name);
     __UNUSED(key);
     __UNUSED(key_size);
-    return -PAL_ERROR_NOTIMPLEMENTED;
+    return PAL_ERROR_NOTIMPLEMENTED;
 }

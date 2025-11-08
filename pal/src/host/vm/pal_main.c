@@ -71,19 +71,19 @@ static int tsc_frequency_init(void) {
     _PalCpuIdRetrieve(INVARIANT_TSC_LEAF, 0, words);
     if (!(words[CPUID_WORD_EDX] & (1 << 8))) {
         /* invariant TSC is not available */
-        return -PAL_ERROR_DENIED;
+        return PAL_ERROR_DENIED;
     }
 
     _PalCpuIdRetrieve(0x40000000, 0, words);
     if (words[CPUID_WORD_EAX] < 0x40000010) {
         /* virtual TSC frequency is not available */
-        return -PAL_ERROR_DENIED;
+        return PAL_ERROR_DENIED;
     }
 
     _PalCpuIdRetrieve(0x40000010, 0, words);
     uint64_t tsc_mhz = words[CPUID_WORD_EAX] / 1000;
     if (!tsc_mhz)
-        return -PAL_ERROR_DENIED;
+        return PAL_ERROR_DENIED;
 
     g_tsc_mhz = tsc_mhz;
     return 0;
@@ -94,7 +94,7 @@ static int switch_apic_to_x2_mode(void) {
     cpuid(FEATURE_FLAGS_LEAF, 0, words);
     if (!(words[CPUID_WORD_ECX] & (1 << 21))) {
         /* x2APIC mode is not available */
-        return -PAL_ERROR_DENIED;
+        return PAL_ERROR_DENIED;
     }
 
     uint64_t msr = rdmsr(MSR_IA32_APIC_BASE);

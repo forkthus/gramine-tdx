@@ -206,7 +206,7 @@ int send_invalidate_tlb_ipi_and_wait(void* addr, size_t size, bool invalidate_on
 
     if (g_invalidate_tlb_request.in_progress || g_invalidate_tlb_request.num_responses) {
         /* sanity check that a previous "invalidate TLB" protocol run is finished */
-        ret = -PAL_ERROR_DENIED;
+        ret = PAL_ERROR_DENIED;
         goto out;
     }
 
@@ -244,7 +244,7 @@ static int idt_gate_set(uint8_t isr_number, void* isr_addr) {
             g_idt[isr_number].ist_offset != 1 ||
             g_idt[isr_number].flags != 0x8E ||
             g_idt[isr_number]._reserved != 0) {
-        return -PAL_ERROR_INVAL;
+        return PAL_ERROR_INVAL;
 	}
 
     uint64_t isr_addr_uint64 = (uint64_t)isr_addr;
@@ -263,11 +263,11 @@ static int tss_init(void) {
     tss += get_per_cpu_data()->cpu_id;
 
     if (tss->rsp0_unused != 0 || tss->rsp1_unused != 0 || tss->rsp2_unused != 0)
-        return -PAL_ERROR_BADADDR;
+        return PAL_ERROR_BADADDR;
     if (tss->ist1 != 0)
-        return -PAL_ERROR_BADADDR;
+        return PAL_ERROR_BADADDR;
     if (tss->iomap_base_unused != sizeof(*tss))
-        return -PAL_ERROR_BADADDR;
+        return PAL_ERROR_BADADDR;
 
     /* interrupt_stack is a base address, but we want top of the stack */
     tss->ist1 = (uint64_t)get_per_cpu_data()->interrupt_stack + INTERRUPT_STACK_SIZE;
@@ -297,103 +297,103 @@ static int idt_init(void) {
     /* hardware interrupts */
     ret = idt_gate_set(0,  &isr_0);  /* Divide-by-zero Error (#DE) */
     if (ret < 0)
-        return -PAL_ERROR_BADADDR;
+        return PAL_ERROR_BADADDR;
 
     ret = idt_gate_set(1,  &isr_1);  /* Debug (#DB) */
     if (ret < 0)
-        return -PAL_ERROR_BADADDR;
+        return PAL_ERROR_BADADDR;
 
     ret = idt_gate_set(2,  &isr_2);  /* Non-maskable Interrupt (NMI) */
     if (ret < 0)
-        return -PAL_ERROR_BADADDR;
+        return PAL_ERROR_BADADDR;
 
     ret = idt_gate_set(3,  &isr_3);  /* Breakpoint (#BP) */
     if (ret < 0)
-        return -PAL_ERROR_BADADDR;
+        return PAL_ERROR_BADADDR;
 
     ret = idt_gate_set(4,  &isr_4);  /* Overflow (#OF) */
     if (ret < 0)
-        return -PAL_ERROR_BADADDR;
+        return PAL_ERROR_BADADDR;
 
     ret = idt_gate_set(5,  &isr_5);  /* Bound Range Exceeded (#BR) */
     if (ret < 0)
-        return -PAL_ERROR_BADADDR;
+        return PAL_ERROR_BADADDR;
 
     ret = idt_gate_set(6,  &isr_6);  /* Invalid Opcode (#UD) */
     if (ret < 0)
-        return -PAL_ERROR_BADADDR;
+        return PAL_ERROR_BADADDR;
 
     ret = idt_gate_set(7,  &isr_7);  /* Device Not Available (#NM) */
     if (ret < 0)
-        return -PAL_ERROR_BADADDR;
+        return PAL_ERROR_BADADDR;
 
     ret = idt_gate_set(8,  &isr_8);  /* Double Fault (#DF) */
     if (ret < 0)
-        return -PAL_ERROR_BADADDR;
+        return PAL_ERROR_BADADDR;
 
     ret = idt_gate_set(9,  &isr_9);  /* <legacy> */
     if (ret < 0)
-        return -PAL_ERROR_BADADDR;
+        return PAL_ERROR_BADADDR;
 
     ret = idt_gate_set(10, &isr_10); /* Invalid TSS (#TS) */
     if (ret < 0)
-        return -PAL_ERROR_BADADDR;
+        return PAL_ERROR_BADADDR;
 
     ret = idt_gate_set(11, &isr_11); /* Segment Not Present (#NP) */
     if (ret < 0)
-        return -PAL_ERROR_BADADDR;
+        return PAL_ERROR_BADADDR;
 
     ret = idt_gate_set(12, &isr_12); /* Stack-Segment Fault (#SS) */
     if (ret < 0)
-        return -PAL_ERROR_BADADDR;
+        return PAL_ERROR_BADADDR;
 
     ret = idt_gate_set(13, &isr_13); /* General Protection Fault (#GP) */
     if (ret < 0)
-        return -PAL_ERROR_BADADDR;
+        return PAL_ERROR_BADADDR;
 
     ret = idt_gate_set(14, &isr_14); /* Page Fault (#PF) */
     if (ret < 0)
-        return -PAL_ERROR_BADADDR;
+        return PAL_ERROR_BADADDR;
 
     ret = idt_gate_set(15, &isr_15); /* <reserved> */
     if (ret < 0)
-        return -PAL_ERROR_BADADDR;
+        return PAL_ERROR_BADADDR;
 
     ret = idt_gate_set(16, &isr_16); /* x87 FP Exception (#MF) */
     if (ret < 0)
-        return -PAL_ERROR_BADADDR;
+        return PAL_ERROR_BADADDR;
 
     ret = idt_gate_set(17, &isr_17); /* Alignment Check (#AC) */
     if (ret < 0)
-        return -PAL_ERROR_BADADDR;
+        return PAL_ERROR_BADADDR;
 
     ret = idt_gate_set(18, &isr_18); /* Machine Check (#MC) */
     if (ret < 0)
-        return -PAL_ERROR_BADADDR;
+        return PAL_ERROR_BADADDR;
 
     ret = idt_gate_set(19, &isr_19); /* SIMD FP Exception (#XM) */
     if (ret < 0)
-        return -PAL_ERROR_BADADDR;
+        return PAL_ERROR_BADADDR;
 
     ret = idt_gate_set(20, &isr_20); /* Virtualization Exception (#VE) */
     if (ret < 0)
-        return -PAL_ERROR_BADADDR;
+        return PAL_ERROR_BADADDR;
 
     ret = idt_gate_set(32, &isr_32); /* Local APIC timer IRQ */
     if (ret < 0)
-        return -PAL_ERROR_BADADDR;
+        return PAL_ERROR_BADADDR;
 
     ret = idt_gate_set(33, &isr_33); /* "Invalidate TLB" IPI interrupt */
     if (ret < 0)
-        return -PAL_ERROR_BADADDR;
+        return PAL_ERROR_BADADDR;
 
     ret = idt_gate_set(39, &isr_spurious);
     if (ret < 0)
-        return -PAL_ERROR_BADADDR;
+        return PAL_ERROR_BADADDR;
 
     ret = idt_gate_set(64, &isr_64); /* generic virtio devices IRQ */
     if (ret < 0)
-        return -PAL_ERROR_BADADDR;
+        return PAL_ERROR_BADADDR;
 
     return 0;
 }

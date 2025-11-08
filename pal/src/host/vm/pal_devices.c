@@ -18,7 +18,7 @@ static int dev_open(PAL_HANDLE* handle, const char* type, const char* uri, enum 
     __UNUSED(share);
     __UNUSED(create);
     __UNUSED(options);
-    return -PAL_ERROR_NOTIMPLEMENTED;
+    return PAL_ERROR_NOTIMPLEMENTED;
 }
 
 static int64_t dev_read(PAL_HANDLE handle, uint64_t offset, uint64_t size, void* buffer) {
@@ -26,7 +26,7 @@ static int64_t dev_read(PAL_HANDLE handle, uint64_t offset, uint64_t size, void*
     __UNUSED(offset);
     __UNUSED(size);
     __UNUSED(buffer);
-    return -PAL_ERROR_NOTIMPLEMENTED;
+    return PAL_ERROR_NOTIMPLEMENTED;
 }
 
 static int64_t dev_write(PAL_HANDLE handle, uint64_t offset, uint64_t size, const void* buffer) {
@@ -34,7 +34,7 @@ static int64_t dev_write(PAL_HANDLE handle, uint64_t offset, uint64_t size, cons
     __UNUSED(offset);
     __UNUSED(size);
     __UNUSED(buffer);
-    return -PAL_ERROR_NOTIMPLEMENTED;
+    return PAL_ERROR_NOTIMPLEMENTED;
 }
 
 static void dev_destroy(PAL_HANDLE handle) {
@@ -45,31 +45,31 @@ static void dev_destroy(PAL_HANDLE handle) {
 static int dev_delete(PAL_HANDLE handle, enum pal_delete_mode delete_mode) {
     __UNUSED(handle);
     __UNUSED(delete_mode);
-    return -PAL_ERROR_NOTIMPLEMENTED;
+    return PAL_ERROR_NOTIMPLEMENTED;
 }
 
 static int dev_setlength(PAL_HANDLE handle, uint64_t length) {
     __UNUSED(handle);
     __UNUSED(length);
-    return -PAL_ERROR_NOTIMPLEMENTED;
+    return PAL_ERROR_NOTIMPLEMENTED;
 }
 
 static int dev_flush(PAL_HANDLE handle) {
     __UNUSED(handle);
-    return -PAL_ERROR_NOTIMPLEMENTED;
+    return PAL_ERROR_NOTIMPLEMENTED;
 }
 
 static int dev_attrquery(const char* type, const char* uri, PAL_STREAM_ATTR* attr) {
     __UNUSED(type);
     __UNUSED(uri);
     __UNUSED(attr);
-    return -PAL_ERROR_NOTIMPLEMENTED;
+    return PAL_ERROR_NOTIMPLEMENTED;
 }
 
 static int dev_attrquerybyhdl(PAL_HANDLE handle, PAL_STREAM_ATTR* attr) {
     __UNUSED(handle);
     __UNUSED(attr);
-    return -PAL_ERROR_NOTIMPLEMENTED;
+    return PAL_ERROR_NOTIMPLEMENTED;
 }
 
 static int dev_map(PAL_HANDLE handle, void* addr, pal_prot_flags_t prot, uint64_t offset,
@@ -79,7 +79,7 @@ static int dev_map(PAL_HANDLE handle, void* addr, pal_prot_flags_t prot, uint64_
     __UNUSED(prot);
     __UNUSED(offset);
     __UNUSED(size);
-    return -PAL_ERROR_NOTIMPLEMENTED;
+    return PAL_ERROR_NOTIMPLEMENTED;
 }
 
 struct handle_ops g_dev_ops = {
@@ -100,5 +100,5 @@ int _PalDeviceIoControl(PAL_HANDLE handle, uint32_t cmd, unsigned long arg, int*
     __UNUSED(cmd);
     __UNUSED(arg);
     __UNUSED(out_ret);
-    return -PAL_ERROR_NOTIMPLEMENTED;
+    return PAL_ERROR_NOTIMPLEMENTED;
 }

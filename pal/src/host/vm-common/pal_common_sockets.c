@@ -166,7 +166,7 @@ int pal_common_socket_create(enum pal_socket_domain domain, enum pal_socket_type
         if (ret < 0) {
             log_error("closing socket fd failed: %s", pal_strerror(ret));
         }
-        return -PAL_ERROR_NOMEM;
+        return PAL_ERROR_NOMEM;
     }
 
     *out_handle = handle;
@@ -191,7 +191,7 @@ static void pal_common_socket_destroy(struct pal_handle* handle) {
 static int pal_common_socket_bind(struct pal_handle* handle, struct pal_socket_addr* addr) {
     assert(handle->hdr.type == PAL_TYPE_SOCKET);
     if (addr->domain != handle->sock.domain) {
-        return -PAL_ERROR_INVAL;
+        return PAL_ERROR_INVAL;
     }
 
     struct sockaddr_vm addr_vm = { .svm_cid = g_vsock->guest_cid };
@@ -241,7 +241,7 @@ static int pal_common_tcp_accept(struct pal_handle* handle, pal_stream_options_t
     while (true) {
         client_fd = virtio_vsock_accept(handle->sock.fd, &client_addr_vm, &client_addr_vm_size);
         if (client_fd < 0) {
-            if (client_fd == -PAL_ERROR_TRYAGAIN && !handle->sock.is_nonblocking) {
+            if (client_fd == PAL_ERROR_TRYAGAIN && !handle->sock.is_nonblocking) {
                 sched_thread_wait(&g_sockets_reader_futex, &handle->sock.lock);
                 continue;
             }
@@ -264,7 +264,7 @@ static int pal_common_tcp_accept(struct pal_handle* handle, pal_stream_options_t
         if (ret < 0) {
             log_error("closing socket fd failed: %s", pal_strerror(ret));
         }
-        return -PAL_ERROR_NOMEM;
+        return PAL_ERROR_NOMEM;
     }
 
     struct sockaddr_vm local_addr_vm = {0};
@@ -291,7 +291,7 @@ static int pal_common_socket_connect(struct pal_handle* handle, struct pal_socke
                                      bool* out_inprogress) {
     assert(handle->hdr.type == PAL_TYPE_SOCKET);
     if (addr->domain != PAL_DISCONNECT && addr->domain != handle->sock.domain) {
-        return -PAL_ERROR_INVAL;
+        return PAL_ERROR_INVAL;
     }
 
     struct sockaddr_vm addr_vm = { .svm_cid = g_vsock->host_cid };
@@ -382,7 +382,7 @@ static int pal_common_tcp_send(struct pal_handle* handle, struct iovec* iov, siz
         int64_t bytes = virtio_vsock_write(handle->sock.fd, iov[iov_idx].iov_base,
                                            iov[iov_idx].iov_len);
         if (bytes < 0) {
-            if (bytes != -PAL_ERROR_TRYAGAIN) {
+            if (bytes != PAL_ERROR_TRYAGAIN) {
                 /* unrecoverable error, fail immediately */
                 spinlock_unlock(&handle->sock.lock);
                 return bytes;
@@ -398,7 +398,7 @@ static int pal_common_tcp_send(struct pal_handle* handle, struct iovec* iov, siz
             }
             /* non-blocking socket that didn't send anything must error out with TRYAGAIN */
             spinlock_unlock(&handle->sock.lock);
-            return -PAL_ERROR_TRYAGAIN;
+            return PAL_ERROR_TRYAGAIN;
         }
 
         /* write succeeded, at least partially */
@@ -428,7 +428,7 @@ static int pal_common_udp_send(struct pal_handle* handle, struct iovec* iov, siz
     __UNUSED(out_size);
     __UNUSED(addr);
     __UNUSED(force_nonblocking);
-    return -PAL_ERROR_NOTIMPLEMENTED;
+    return PAL_ERROR_NOTIMPLEMENTED;
 }
 
 static int pal_common_tcp_recv(struct pal_handle* handle, struct iovec* iov, size_t iov_len,
@@ -450,7 +450,7 @@ static int pal_common_tcp_recv(struct pal_handle* handle, struct iovec* iov, siz
         int64_t bytes = virtio_vsock_read(handle->sock.fd, iov[iov_idx].iov_base,
                                           iov[iov_idx].iov_len);
         if (bytes < 0) {
-            if (bytes != -PAL_ERROR_TRYAGAIN) {
+            if (bytes != PAL_ERROR_TRYAGAIN) {
                 /* unrecoverable error, fail immediately */
                 spinlock_unlock(&handle->sock.lock);
                 return bytes;
@@ -466,7 +466,7 @@ static int pal_common_tcp_recv(struct pal_handle* handle, struct iovec* iov, siz
             }
             /* non-blocking socket that didn't receive anything must error out with TRYAGAIN */
             spinlock_unlock(&handle->sock.lock);
-            return -PAL_ERROR_TRYAGAIN;
+            return PAL_ERROR_TRYAGAIN;
         }
 
         /* read succeeded, at least partially */
@@ -496,7 +496,7 @@ static int pal_common_udp_recv(struct pal_handle* handle, struct iovec* iov, siz
     __UNUSED(out_total_size);
     __UNUSED(addr);
     __UNUSED(force_nonblocking);
-    return -PAL_ERROR_NOTIMPLEMENTED;
+    return PAL_ERROR_NOTIMPLEMENTED;
 }
 
 static int pal_common_tcp_delete(struct pal_handle* handle, enum pal_delete_mode mode) {
@@ -517,7 +517,7 @@ static int pal_common_tcp_delete(struct pal_handle* handle, enum pal_delete_mode
             break;
         default:
             spinlock_unlock(&handle->sock.lock);
-            return -PAL_ERROR_INVAL;
+            return PAL_ERROR_INVAL;
     }
 
     int ret = virtio_vsock_shutdown(handle->sock.fd, shutdown);

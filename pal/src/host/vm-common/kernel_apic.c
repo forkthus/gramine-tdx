@@ -84,7 +84,7 @@ int lapic_timer_init(void) {
     cpuid(FEATURE_FLAGS_LEAF, 0, words);
     if (!(words[CPUID_WORD_ECX] & (1 << 24))) {
         /* TSC deadline timer is not available */
-        return -PAL_ERROR_DENIED;
+        return PAL_ERROR_DENIED;
     }
 
     /* set up LVT timer: with IRQ 32, in TSC-Deadline mode (bit 18 set), not masked */

@@ -122,9 +122,9 @@ int pal_common_segment_base_get(enum pal_segment_reg reg, uintptr_t* addr) {
             return 0;
         case PAL_SEGMENT_GS:
             /* GS is internally used, deny any access to it */
-            return -PAL_ERROR_DENIED;
+            return PAL_ERROR_DENIED;
         default:
-            return -PAL_ERROR_INVAL;
+            return PAL_ERROR_INVAL;
     }
 }
 
@@ -138,9 +138,9 @@ int pal_common_segment_base_set(enum pal_segment_reg reg, uintptr_t addr) {
             return 0;
         case PAL_SEGMENT_GS:
             // The GS segment is used for the internal TCB of PAL
-            return -PAL_ERROR_DENIED;
+            return PAL_ERROR_DENIED;
         default:
-            return -PAL_ERROR_INVAL;
+            return PAL_ERROR_INVAL;
     }
-    return -PAL_ERROR_NOTIMPLEMENTED;
+    return PAL_ERROR_NOTIMPLEMENTED;
 }

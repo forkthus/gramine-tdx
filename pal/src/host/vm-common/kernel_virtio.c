@@ -24,17 +24,17 @@
 
 int virtq_create(uint16_t queue_size, struct virtqueue** out_virtq) {
     if (queue_size > VIRTQUEUE_MAX_QUEUE_SIZE)
-        return -PAL_ERROR_INVAL;
+        return PAL_ERROR_INVAL;
 
     struct virtqueue* virtq = malloc(sizeof(*virtq));
     if (!virtq)
-        return -PAL_ERROR_NOMEM;
+        return PAL_ERROR_NOMEM;
     memset(virtq, 0, sizeof(*virtq));
 
     void* events = memory_get_shared_region(sizeof(uint16_t) + sizeof(uint16_t));
     if (!events) {
         free(virtq);
-        return -PAL_ERROR_NOMEM;
+        return PAL_ERROR_NOMEM;
     }
 
     virtq->next_free_desc = malloc(queue_size * sizeof(uint16_t));
@@ -81,7 +81,7 @@ int virtq_create(uint16_t queue_size, struct virtqueue** out_virtq) {
 
 fail:
     virtq_free(virtq, queue_size);
-    return -PAL_ERROR_NOMEM;
+    return PAL_ERROR_NOMEM;
 }
 
 int virtq_free(struct virtqueue* virtq, uint16_t queue_size) {
@@ -104,13 +104,13 @@ int virtq_alloc_desc(struct virtqueue* virtq, void* addr, uint32_t len, uint16_t
                      uint16_t* out_desc_idx) {
     if (flags & VIRTQ_DESC_F_INDIRECT) {
         /* current implementation doesn't allow indirect descriptors */
-        return -PAL_ERROR_INVAL;
+        return PAL_ERROR_INVAL;
     }
 
     uint16_t idx = virtq->free_desc;
     if (idx == virtq->queue_size) {
         /* ran out of free descriptors, can try again after at least one virtq_free_desc() */
-        return -PAL_ERROR_NOMEM;
+        return PAL_ERROR_NOMEM;
     }
 
     /* rewire head of free-descriptors linked list to the next free descriptor (which could also be
@@ -144,7 +144,7 @@ int virtq_add_to_device(struct virtio_pci_regs* regs, struct virtqueue* virtq, u
     uint16_t queue_available_hint = vm_mmio_readw(&regs->queue_size);
     if (queue_available_hint == 0x0) {
         /* queue with this index is not available (not supported by the device) */
-        return -PAL_ERROR_DENIED;
+        return PAL_ERROR_DENIED;
     }
 
     vm_mmio_writew(&regs->queue_size, virtq->queue_size);

@@ -45,7 +45,7 @@ int read_text_file_to_cstr(const char* path, char** out_buf, uint64_t* out_size)
 
     buf = malloc(attr.size + 1);
     if (!buf) {
-        ret = -PAL_ERROR_NOMEM;
+        ret = PAL_ERROR_NOMEM;
         goto out;
     }
 
@@ -55,12 +55,12 @@ int read_text_file_to_cstr(const char* path, char** out_buf, uint64_t* out_size)
         ret = virtio_fs_fuse_read(nodeid, fh, MIN(attr.size - bytes_read, FILE_CHUNK_SIZE),
                                   bytes_read, buf + bytes_read, &read_size);
         if (ret < 0) {
-            if (ret == -PAL_ERROR_INTERRUPTED)
+            if (ret == PAL_ERROR_INTERRUPTED)
                 continue;
             goto out;
         }
         if (read_size == 0) {
-            ret = -PAL_ERROR_INVAL; /* unexpected EOF */
+            ret = PAL_ERROR_INVAL; /* unexpected EOF */
             goto out;
         }
         bytes_read += read_size;
@@ -85,10 +85,10 @@ int emulate_file_map_via_read(uint64_t nodeid, uint64_t fh, void* addr, uint64_t
                               uint64_t size) {
     uint64_t dummy;
     if (__builtin_add_overflow(offset, size, &dummy))
-        return -PAL_ERROR_INVAL;
+        return PAL_ERROR_INVAL;
 
     if (!addr)
-        return -PAL_ERROR_INVAL;
+        return PAL_ERROR_INVAL;
 
     uint64_t bytes_read = 0;
     while (bytes_read < size) {
@@ -96,7 +96,7 @@ int emulate_file_map_via_read(uint64_t nodeid, uint64_t fh, void* addr, uint64_t
         int ret = virtio_fs_fuse_read(nodeid, fh, MIN(size - bytes_read, FILE_CHUNK_SIZE),
                                       offset + bytes_read, addr + bytes_read, &read_size);
         if (ret < 0) {
-            if (ret == -PAL_ERROR_INTERRUPTED)
+            if (ret == PAL_ERROR_INTERRUPTED)
                 continue;
             return ret;
         }

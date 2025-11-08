@@ -41,7 +41,7 @@ int pal_common_thread_create(struct pal_handle** handle, int (*callback)(void*),
 
     struct pal_handle* thread_handle = calloc(1, sizeof(*thread_handle));
     if (!thread_handle)
-        return -PAL_ERROR_NOMEM;
+        return PAL_ERROR_NOMEM;
 
     void* stack;
     void* fpregs;
@@ -108,12 +108,12 @@ int pal_common_thread_get_cpu_affinity(struct pal_handle* thread, unsigned long*
 
     if (cpu_mask_len * BITS_IN_TYPE(*cpu_mask) > MAX_NUM_CPUS) {
         log_error("Get CPU affinity: too many CPUs requested in CPU mask.");
-        return -PAL_ERROR_INVAL;
+        return PAL_ERROR_INVAL;
     }
 
     if (cpu_mask_len * BITS_IN_TYPE(*cpu_mask) < g_num_cpus) {
         log_error("Get CPU affinity: CPU mask cannot fit all CPUs.");
-        return -PAL_ERROR_INVAL;
+        return PAL_ERROR_INVAL;
     }
 
     for (size_t i = 0; i < g_num_cpus; i++) {
