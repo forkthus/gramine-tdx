@@ -416,5 +416,12 @@ struct libos_thread* terminate_async_worker(void) {
 
     /* force wake up of async worker thread so that it exits */
     set_pollable_event(&install_new_event);
-    return ret;
+
+    while (__atomic_load_n(&async_worker_running, __ATOMIC_ACQUIRE)) {
+        /* yield the execution so the async worker can run and exit when there is only one vCPU */
+        PalThreadYieldExecution();
+        CPU_RELAX();
+    }
+
+    /* no need to clean up resources, as this function is called at process exit */
 }
