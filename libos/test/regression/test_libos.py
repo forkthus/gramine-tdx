@@ -1100,6 +1100,38 @@ class TC_30_Syscall(RegressionTestCase):
         stdout, _ = self.run_binary(['itimer'])
         self.assertIn("TEST OK", stdout)
 
+    def test_160_rlimit_nofile(self):
+        # uses manifest.template
+        stdout, _ = self.run_binary(['rlimit_nofile'])
+        self.assertIn("old RLIMIT_NOFILE soft limit: 900", stdout)
+        self.assertIn("(before setrlimit) opened fd: 899", stdout)
+        self.assertIn("new RLIMIT_NOFILE soft limit: 901", stdout)
+        if not (HAS_TDX or HAS_VM):
+            self.assertIn("(in child, after setrlimit) opened fd: 900", stdout)
+        self.assertIn("(after setrlimit) opened fd: 900", stdout)
+        self.assertIn("TEST OK", stdout)
+
+    def test_161_rlimit_nofile_4k(self):
+        # uses rlimit_nofile_4k.manifest.template
+        stdout, _ = self.run_binary(['rlimit_nofile_4k'])
+        self.assertIn("old RLIMIT_NOFILE soft limit: 4096", stdout)
+        self.assertIn("(before setrlimit) opened fd: 4095", stdout)
+        self.assertIn("new RLIMIT_NOFILE soft limit: 4097", stdout)
+        if not (HAS_TDX or HAS_VM):
+            self.assertIn("(in child, after setrlimit) opened fd: 4096", stdout)
+        self.assertIn("(after setrlimit) opened fd: 4096", stdout)
+        self.assertIn("TEST OK", stdout)
+
+    def test_162_rlimit_stack(self):
+        # rlimit_stack.manifest.template specifies 1MB (= 1048576B) stack size
+        stdout, _ = self.run_binary(['rlimit_stack'])
+        self.assertIn("old RLIMIT_STACK soft limit: 1048576", stdout)
+        self.assertIn("new RLIMIT_STACK soft limit: 1048577", stdout)
+        if not (HAS_TDX or HAS_VM):
+            self.assertIn("(in child, after setrlimit) RLIMIT_STACK soft limit: 1048577", stdout)
+        self.assertIn("(in parent, after setrlimit) RLIMIT_STACK soft limit: 1048577", stdout)
+        self.assertIn("TEST OK", stdout)
+
 class TC_31_Syscall(RegressionTestCase):
     def test_000_syscall_redirect(self):
         stdout, _ = self.run_binary(['syscall'])
@@ -1112,6 +1144,18 @@ class TC_31_Syscall(RegressionTestCase):
         self.assertIn('Handling signal 15', stdout)
         self.assertIn('Got: P', stdout)
         self.assertIn('TEST 2 OK', stdout)
+
+    def test_020_mock_syscalls(self):
+        stdout, stderr = self.run_binary(['mock_syscalls'])
+        output = stdout if (HAS_TDX or HAS_VM) else stderr
+        self.assertIn('eventfd2(...) = -38 (mock)', output)
+        if USES_MUSL:
+            self.assertIn('fork(...) = -38 (mock)', output)
+        else:
+            self.assertIn('clone(...) = -38 (mock)', output)
+        self.assertIn('sched_yield(...) = 0 (mock)', output)
+        self.assertIn('vhangup(...) = 123 (mock)', output)
+        self.assertIn('TEST OK', stdout)
 
 class TC_40_FileSystem(RegressionTestCase):
     def test_000_proc(self):
@@ -1450,7 +1494,15 @@ class TC_50_GDB(RegressionTestCase):
         xmm0_result = self.find('XMM0 result', stdout)
         self.assertEqual(xmm0_result, '$4 = 0x4000400040004000')
 
-    @unittest.skipUnless(HAS_SGX, 'Trusted files bug was SGX-specific')
+    # There's a bug in gdb introduced somewhere between versions 12 and 13 (and
+    # still present in 15.x at the time of this writing): When using `set
+    # detach-on-fork off` and `set schedule-multiple on` (which our gramine.gdb
+    # uses) non-main threads in the parent process get stuck in "tracing stop"
+    # state after vfork+execve. This test uses gdb and unfortunately triggers
+    # the bug.
+    @unittest.skipIf(HAS_TDX or HAS_VM, "Gramine-TDX does not support GDB at the current time")
+    @unittest.skipUnless(GDB_VERSION is not None and GDB_VERSION < (13,),
+        f'missing or known buggy GDB ({GDB_VERSION=})')
     def test_020_gdb_fork_and_access_file_bug(self):
         # To run this test manually, use:
         # GDB=1 GDB_SCRIPT=fork_and_access_file.gdb gramine-sgx fork_and_access_file
