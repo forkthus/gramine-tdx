@@ -861,18 +861,17 @@ class TC_30_Syscall(RegressionTestCase):
 
         # "test 5" and "test 8" are checked below, in test_051_mmap_sgx
 
-    @unittest.skipIf(HAS_SGX,
-        'On SGX, SIGBUS isn\'t always implemented correctly, for lack '
-        'of memory protection. For now, some of these cases won\'t work.')
-    def test_051_mmap_sgx(self):
-        stdout, _ = self.run_binary(['mmap_file'], timeout=60)
+    @unittest.skipIf(HAS_SGX and not HAS_EDMM,
+        'On SGX without EDMM, SIGBUS cannot be triggered for lack of dynamic memory protection.')
+    @unittest.skipIf(HAS_TDX or HAS_VM, "Gramine-TDX does not support multi-process creation at the current time")
+    def test_051_mmap_file_sigbus_child(self):
+        read_path, write_path = self._prepare_mmap_file_sigbus_files()
+        stdout, _ = self.run_binary(['mmap_file_sigbus', read_path, write_path, 'fork'], timeout=60)
+        self.assertIn('PARENT OK', stdout)
+        self.assertIn('CHILD OK', stdout)
+        self.assertIn('TEST OK', stdout)
 
-        # SIGBUS test
-        self.assertIn('mmap test 5 passed', stdout)
-        self.assertIn('mmap test 8 passed', stdout)
-
-    @unittest.skipUnless(HAS_SGX,
-        'Trusted files are only available with SGX')
+    @unittest.skipIf(HAS_TDX or HAS_VM, "Gramine-TDX does not support multi-process creation at the current time")
     def test_052_mmap_file_backed_trusted(self):
         stdout, _ = self.run_binary(['mmap_file_backed', 'mmap_file_backed'], timeout=60)
         self.assertIn('Child process done', stdout)
