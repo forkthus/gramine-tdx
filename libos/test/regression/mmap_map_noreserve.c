@@ -225,6 +225,10 @@ int main(void) {
 
     offset = get_random_ulong() % TEST_LENGTH2;
     WRITE_ONCE(a[offset], expected_val);
+<<<<<<< HEAD
+=======
+#if 0 /* Skip for Gramine-TDX, as it currently doesn't support process creation */
+>>>>>>> fb3e8a76 ([PAL/VM,TDX] Add new APIs introduced by EDMM Lazy allocation support to VM/TDX PAL)
     pid_t pid = CHECK(fork());
     if (pid == 0) {
         data = READ_ONCE(a[offset]);
@@ -237,6 +241,10 @@ int main(void) {
     CHECK(wait(&status));
     if (!WIFEXITED(status) || WEXITSTATUS(status) != 0)
         errx(1, "child wait status: %#x", status);
+<<<<<<< HEAD
+=======
+#endif
+>>>>>>> fb3e8a76 ([PAL/VM,TDX] Add new APIs introduced by EDMM Lazy allocation support to VM/TDX PAL)
 
     CHECK(munmap(a, TEST_LENGTH2));
 

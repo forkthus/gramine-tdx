@@ -11,7 +11,11 @@ fs.mounts = [
   { path = "/{{ entrypoint }}", uri = "file:{{ binary_dir }}/{{ entrypoint }}" },
 ]
 
+<<<<<<< HEAD
 sgx.enclave_size = "4G"
+=======
+sgx.enclave_size = "8G"
+>>>>>>> fb3e8a76 ([PAL/VM,TDX] Add new APIs introduced by EDMM Lazy allocation support to VM/TDX PAL)
 sgx.max_threads = {{ '1' if env.get('EDMM', '0') == '1' else '20' }}
 sgx.debug = true
 sgx.edmm_enable = {{ 'true' if env.get('EDMM', '0') == '1' else 'false' }}
