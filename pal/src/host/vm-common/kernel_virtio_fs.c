@@ -89,6 +89,52 @@ int virtio_fs_isr(void) {
     return 0;
 }
 
+static int vsock_write_all(int fd, const void* buf, size_t size) {
+    if (!size)
+        return 0;
+
+    size_t sent = 0;
+    while (sent < size) {
+        long ret = virtio_vsock_write(fd, (const char*)buf + sent, size - sent);
+        if (ret == -PAL_ERROR_TRYAGAIN) {
+            /* 
+             * Avoid calling the scheduler here (only one thread exists in pal_start); 
+             * drive vsock progress directly. 
+             */
+            (void)virtio_vsock_bottomhalf();
+            CPU_RELAX();
+            continue;
+        }
+        if (ret < 0)
+            return (int)ret;
+        sent += (size_t)ret;
+    }
+    return 0;
+}
+
+static int vsock_read_exact(int fd, void* buf, size_t size) {
+    if (!size)
+        return 0;
+
+    size_t received = 0;
+    while (received < size) {
+        long ret = virtio_vsock_read(fd, (char*)buf + received, size - received);
+        if (ret == -PAL_ERROR_TRYAGAIN) {
+            /* 
+             * Avoid calling the scheduler here (only one thread exists in pal_start); 
+             * drive vsock progress directly. 
+             */
+            (void)virtio_vsock_bottomhalf();
+            CPU_RELAX();
+            continue;
+        }
+        if (ret < 0)
+            return (int)ret;
+        received += (size_t)ret;
+    }
+    return 0;
+}
+
 /* execute a single virtio-fs FUSE request to completion: copy relevant contents to shared memory,
  * submit `count` chained descriptors, kick the device, wait until the device processed the request
  * and then copy contents from device's shared memory to secure memory */
@@ -97,7 +143,6 @@ static int virtio_fs_exec_request(size_t count, struct virtio_fs_desc* descs) {
     assert(count >= 3);
 
     int ret;
-
     struct fuse_in_header* hdr_in = descs[0].addr;
 
     spinlock_lock(&g_fs_lock);
@@ -130,6 +175,7 @@ static int virtio_fs_exec_request(size_t count, struct virtio_fs_desc* descs) {
     }
 
     if (total_in_size + total_out_size > VIRTIO_FS_SHARED_BUF_SIZE) {
+        /* Keep the same limitation under vsock implementation */
         /* FS request doesn't fit into shared buffer, cannot send it */
         ret = -PAL_ERROR_NOMEM;
         goto out;
@@ -137,25 +183,41 @@ static int virtio_fs_exec_request(size_t count, struct virtio_fs_desc* descs) {
 
     hdr_in->len = total_in_size;
 
-    char* shared_buf_addr = g_fs->shared_buf;
     for (size_t i = 0; i < count; i++) {
-        uint16_t flags = i == count - 1 ? 0 : VIRTQ_DESC_F_NEXT;
         if (descs[i].in) {
-            int64_t bytes = virtio_vsock_write(g_fs->vsock_fd, descs[i].addr, descs[i].size);
+            ret = vsock_write_all(g_fs->vsock_fd, descs[i].addr, descs[i].size);
+            if (ret < 0)
+                goto out;
         }
     }
 
-    shared_buf_addr = g_fs->shared_buf;
-    for (size_t i = 0; i < count; i++) {
+    size_t first_out = 0;
+    while (first_out < count && descs[first_out].in)
+        first_out++;
+
+    ret = vsock_read_exact(g_fs->vsock_fd, descs[first_out].addr, sizeof(struct fuse_out_header));
+    if (ret < 0)
+        goto out;
+
+    struct fuse_out_header* hdr_out = (struct fuse_out_header*)descs[first_out].addr;
+
+    size_t remaining = hdr_out->len - sizeof(*hdr_out);
+
+    /* Fill subsequent out-descriptors; zero-fill any unused bytes. */
+    for (size_t i = first_out + 1; i < count; i++) {
         if (!descs[i].in) {
-            int64_t bytes = virtio_vsock_read(g_fs->vsock_fd, descs[i].addr, descs[i].size);
-            while (bytes < 0)
-            {
-                bytes = virtio_vsock_read(g_fs->vsock_fd, descs[i].addr, descs[i].size);                
-                sched_thread(NULL, NULL);
+            size_t take = remaining < descs[i].size ? remaining : descs[i].size;
+            if (take) {
+                ret = vsock_read_exact(g_fs->vsock_fd, descs[i].addr, take);
+                if (ret < 0)
+                    goto out;
             }
+
+            if (take < descs[i].size)
+                memset((char*)descs[i].addr + take, 0, descs[i].size - take);
+
+            remaining -= take;
         }
-        shared_buf_addr += descs[i].size;
     }
 
     ret = 0;

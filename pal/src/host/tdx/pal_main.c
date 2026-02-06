@@ -357,9 +357,6 @@ noreturn void pal_start_c(void* hob_addr, void* this_addr) {
     if (ret < 0)
         INIT_FAIL("Can't read host's PWD from VMM");
 
-    ret = virtio_fs_fuse_init();
-    if (ret < 0)
-        INIT_FAIL("Failed FUSE_INIT request of virtio-fs driver");
 
     ret = _PalThreadCreate(&g_first_thread_handle, pal_start_continue, g_cmdline);
     if (ret < 0)
@@ -371,6 +368,10 @@ noreturn void pal_start_c(void* hob_addr, void* this_addr) {
 
 noreturn int pal_start_continue(void* cmdline_) {
     int ret;
+
+    ret = virtio_fs_fuse_init();
+    if (ret < 0)
+        INIT_FAIL("Failed FUSE_INIT request of virtio-fs driver");
 
     const char* cmdline = (const char*)cmdline_;
 
