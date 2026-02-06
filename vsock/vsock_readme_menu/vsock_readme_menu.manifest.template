@@ -1,0 +1,25 @@
+# SPDX-License-Identifier: BSD-3-Clause
+
+libos.entrypoint = "/vsock_readme_menu"
+loader.log_level = "{{ log_level }}"
+
+loader.env.LD_LIBRARY_PATH = "/lib"
+loader.insecure__use_cmdline_argv = true
+
+fs.mounts = [
+  { path = "/lib", uri = "file:{{ gramine.runtimedir() }}" },
+  { path = "/vsock_readme_menu", uri = "file:vsock_readme_menu" },
+  { path = "/home/ubuntu", uri = "file:/home/ubuntu" },
+]
+
+sgx.debug = true
+sgx.edmm_enable = {{ 'true' if env.get('EDMM', '0') == '1' else 'false' }}
+
+sgx.trusted_files = [
+  "file:vsock_readme_menu",
+  "file:{{ gramine.runtimedir() }}/",
+]
+
+sgx.allowed_files = [
+  "file:/home/ubuntu/",
+]
