@@ -1,0 +1,46 @@
+# SPDX-License-Identifier: BSD-3-Clause
+
+# Run fio from this directory:
+#   - ./fio
+#   - ./lib/*.so* (optional for dynamic builds)
+
+libos.entrypoint = "/install/fio"
+
+loader.log_level = "{{ log_level }}"
+loader.insecure__use_cmdline_argv = true
+
+# Improve shutdown behavior when the host kills the VM/TD.
+sys.enable_sigterm_injection = true
+
+{% set fio_host_dir = env.get('FIO_HOST_DIR', '/home/ubuntu') %}
+
+fs.mounts = [
+  # Gramine runtime (glibc, loader, etc.).
+  { path = "/lib", uri = "file:{{ gramine.runtimedir() }}" },
+  { path = "/lib64", uri = "file:{{ gramine.runtimedir() }}" },
+
+  { type = "tmpfs", path = "/tmp" },
+
+  # fio binary + optional bundled shared libs.
+  { path = "/install/fio", uri = "file:fio" },
+  { type = "chroot", path = "/install/lib", uri = "file:lib" },
+
+  # Mount host directory selected at build time.
+  { path = "{{ fio_host_dir }}", uri = "file:{{ fio_host_dir }}" },
+]
+
+sgx.debug = true
+sgx.edmm_enable = {{ 'true' if env.get('EDMM', '0') == '1' else 'false' }}
+sgx.max_threads = {{ '1' if env.get('EDMM', '0') == '1' else '64' }}
+sgx.enclave_size = "2048M"
+sgx.use_exinfo = {{ 'true' if env.get('EDMM', '0') == '1' else 'false' }}
+
+sgx.allowed_files = [
+  "file:{{ fio_host_dir }}/",
+]
+
+sgx.trusted_files = [
+  "file:fio",
+  "file:lib/",
+  "file:{{ gramine.runtimedir() }}/",
+]
