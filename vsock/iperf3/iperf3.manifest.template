@@ -1,0 +1,48 @@
+# Copyright (C) 2026
+# SPDX-License-Identifier: BSD-3-Clause
+
+# Run iperf3 from this directory:
+#   - ./iperf3
+#   - ./lib/libiperf.so.0*
+
+libos.entrypoint = "/install/iperf3"
+
+loader.log_level = "{{ log_level }}"
+
+# Allow passing iperf3 args at runtime (e.g. via `vsock_vm.sh run iperf3 ...`).
+loader.insecure__use_cmdline_argv = true
+
+loader.env.LD_LIBRARY_PATH = "/install/lib:/lib"
+
+# Improve shutdown behavior when the host kills the VM/TD.
+sys.enable_sigterm_injection = true
+
+# (Optional) helps if you use hostnames instead of numeric IPs.
+sys.enable_extra_runtime_domain_names_conf = true
+
+fs.mounts = [
+  # Gramine runtime (glibc, loader, etc.)
+  { path = "/lib", uri = "file:{{ gramine.runtimedir() }}" },
+  # Many distro-built binaries request the interpreter at /lib64/ld-linux-x86-64.so.2.
+  { path = "/lib64", uri = "file:{{ gramine.runtimedir() }}" },
+
+  { type = "tmpfs", path = "/tmp" },
+
+  # iperf3 executable + its private shared libs
+  { path = "/install/iperf3", uri = "file:iperf3" },
+  { type = "chroot", path = "/install/lib", uri = "file:lib" },
+]
+
+sgx.debug = true
+sgx.edmm_enable = {{ 'true' if env.get('EDMM', '0') == '1' else 'false' }}
+# iperf3 spawns multiple helper threads (and Gramine may spawn additional ones).
+# Keep this comfortably above typical `-P` values to avoid hangs due to thread exhaustion.
+sgx.max_threads = {{ '1' if env.get('EDMM', '0') == '1' else '32' }}
+sgx.enclave_size = "1024M"
+sgx.use_exinfo = {{ 'true' if env.get('EDMM', '0') == '1' else 'false' }}
+
+sgx.trusted_files = [
+  "file:iperf3",
+  "file:lib/",
+  "file:{{ gramine.runtimedir() }}/",
+]
