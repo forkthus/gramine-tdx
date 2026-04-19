@@ -7,6 +7,7 @@
  */
 
 #include <stdint.h>
+#include <string.h>
 
 #include "api.h"
 #include "cpu.h"
@@ -194,6 +195,110 @@ noreturn static void print_usage_and_exit(void) {
 
 noreturn int pal_start_continue(void* cmdline_);
 
+#define NITRO_HEARTBEAT_PORT           9000
+#define NITRO_HEARTBEAT_BYTE           0xB7
+#define NITRO_HEARTBEAT_RETRIES        20
+#define NITRO_HEARTBEAT_RETRY_US       (100 * TIME_US_IN_MS)
+#define NITRO_HEARTBEAT_ECHO_RETRIES   20
+#define NITRO_HEARTBEAT_ECHO_RETRY_US  (10 * TIME_US_IN_MS)
+
+/* Trying to find the environment variable `GRAMINE_NITRO_HEARTBEAT=1` */
+static bool nitro_heartbeat_enabled(void) {
+    const char prefix[] = "GRAMINE_NITRO_HEARTBEAT=";
+    const size_t prefix_len = sizeof(prefix) - 1;
+    int envp_cnt = 0;
+    const char* envp[MAX_ENVS_CNT] = {NULL};
+    int i;
+
+    if (cmdline_read_gramine_envs(g_envs, &envp_cnt, &envp[0]) < 0)
+        return false;
+
+    for (i = 0; i < envp_cnt; i++) {
+        const char* entry = envp[i];
+        const char* value;
+
+        if (!entry || strncmp(entry, prefix, prefix_len) != 0)
+            continue;
+
+        value = entry + prefix_len;
+
+        if (!strcmp(value, "1"))
+            return true;
+
+        return false;
+    }
+
+    return false;
+}
+
+static int nitro_send_heartbeat(void) {
+    struct sockaddr_vm addr_vm = {
+        .svm_family = AF_VSOCK,
+        .svm_port = NITRO_HEARTBEAT_PORT,
+        .svm_cid = g_vsock->host_cid,
+    };
+    uint8_t heartbeat = NITRO_HEARTBEAT_BYTE;
+    uint8_t echo = 0;
+    int fd = -1;
+    int i;
+    int ret = -PAL_ERROR_DENIED;
+
+    if (!g_vsock)
+        return -PAL_ERROR_DENIED;
+
+    for (i = 0; i < NITRO_HEARTBEAT_RETRIES; i++) {
+        long bytes = 0;
+
+        fd = virtio_vsock_socket(AF_VSOCK, VIRTIO_VSOCK_TYPE_STREAM, /*protocol=*/0);
+        if (fd < 0) {
+            ret = fd;
+            goto retry;
+        }
+
+        ret = virtio_vsock_connect(fd, &addr_vm, sizeof(addr_vm),
+                                   2 * TIME_US_IN_S);
+        if (ret < 0)
+            goto close_and_retry;
+
+        bytes = virtio_vsock_write(fd, &heartbeat, sizeof(heartbeat));
+        if (bytes != (long)sizeof(heartbeat)) {
+            ret = bytes < 0 ? (int)bytes : -PAL_ERROR_DENIED;
+            goto close_and_retry;
+        }
+
+        for (int echo_try = 0; echo_try < NITRO_HEARTBEAT_ECHO_RETRIES; echo_try++) {
+            bytes = virtio_vsock_read(fd, &echo, sizeof(echo));
+            if (bytes == (long)sizeof(echo) && echo == heartbeat) {
+                (void)virtio_vsock_close(fd, VSOCK_CLOSE_TIMEOUT_US);
+                return 0;
+            }
+
+            ret = bytes < 0 ? (int)bytes : -PAL_ERROR_DENIED;
+            if (ret != -PAL_ERROR_TRYAGAIN)
+                break;
+
+            if (echo_try + 1 != NITRO_HEARTBEAT_ECHO_RETRIES) {
+                ret = delay(NITRO_HEARTBEAT_ECHO_RETRY_US, /*continue_gate=*/NULL);
+                if (ret < 0)
+                    return ret;
+            }
+        }
+
+close_and_retry:
+        (void)virtio_vsock_close(fd, VSOCK_CLOSE_TIMEOUT_US);
+
+retry:
+        if (i + 1 != NITRO_HEARTBEAT_RETRIES) {
+            ret = delay(NITRO_HEARTBEAT_RETRY_US, /*continue_gate=*/NULL);
+            if (ret < 0)
+                return ret;
+        }
+    }
+
+    return ret;
+}
+
+
 /*
  * C entry, called by `pal_bootloader.S` on kernel startup:
  *   - RDI: holds the payload HOB address
@@ -372,6 +477,12 @@ noreturn int pal_start_continue(void* cmdline_) {
     ret = virtio_fs_fuse_init();
     if (ret < 0)
         INIT_FAIL("Failed FUSE_INIT request of virtio-fs driver");
+
+    if (nitro_heartbeat_enabled()) {
+        ret = nitro_send_heartbeat();
+        if (ret < 0)
+            INIT_FAIL("Failed Nitro-compatible heartbeat over vsock: %s", pal_strerror(ret));
+    }
 
     const char* cmdline = (const char*)cmdline_;
 
