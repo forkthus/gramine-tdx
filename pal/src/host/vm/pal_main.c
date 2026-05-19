@@ -34,6 +34,7 @@
 #include "kernel_virtio.h"
 #include "kernel_vmm_inputs.h"
 #include "kernel_xsave.h"
+#include "vm_callbacks.h"
 
 uint64_t g_tsc_mhz;
 
@@ -160,6 +161,7 @@ noreturn void pal_start_c(void) {
     int ret;
 
     set_dummy_gs_base();
+    boot_timing_mark(BOOT_TIMING_PAL_START_C);
 
     /* initialize alloc_align as early as possible, a lot of PAL APIs depend on this being set */
     g_pal_public_state.alloc_align = PAGE_SIZE;
@@ -280,6 +282,7 @@ noreturn void pal_start_c(void) {
     if (ret < 0)
         INIT_FAIL("Failed FUSE_INIT request of virtio-fs driver");
 
+    boot_timing_mark(BOOT_TIMING_PAL_BEFORE_FIRST_THREAD);
     ret = _PalThreadCreate(&g_first_thread_handle, pal_start_continue, g_cmdline);
     if (ret < 0)
         INIT_FAIL("Failed to create first thread");
@@ -292,6 +295,7 @@ noreturn int pal_start_continue(void* cmdline_) {
     int ret;
 
     const char* cmdline = (const char*)cmdline_;
+    boot_timing_mark(BOOT_TIMING_PAL_START_CONTINUE);
 
     /* relocate PAL */
     set_pal_binary_name("pal");
@@ -354,6 +358,7 @@ noreturn int pal_start_continue(void* cmdline_) {
     if (ret < 0)
         INIT_FAIL("Failed to get topology information: %s", pal_strerror(ret));
 
+    boot_timing_mark(BOOT_TIMING_PAL_BEFORE_PAL_MAIN);
     pal_main(/*instance_id=*/0, /*parent_process=*/NULL, g_first_thread_handle, argv + 1, envp,
              /*post_callback=*/NULL);
     __builtin_unreachable();

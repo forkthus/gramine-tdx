@@ -63,6 +63,7 @@ static inline void check_portio_write(uint16_t port) {
             port != PCI_CONFIG_SPACE_DATA_IO_PORT + 2 &&
             port != PCI_CONFIG_SPACE_DATA_IO_PORT + 3 &&
             port != FW_CFG_PORT_SEL &&
+            port != BOOT_TIMING_IO_PORT &&
             port != SERIAL_IO_PORT) {
         /* not a known port to be written */
         BUG();

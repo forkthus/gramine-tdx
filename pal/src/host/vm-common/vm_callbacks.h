@@ -41,4 +41,14 @@ void vm_portio_writeb(uint16_t port, uint8_t val);
 void vm_portio_writew(uint16_t port, uint16_t val);
 void vm_portio_writel(uint16_t port, uint32_t val);
 
+#define BOOT_TIMING_IO_PORT 0xF4
+#define BOOT_TIMING_PAL_START_C 50
+#define BOOT_TIMING_PAL_BEFORE_FIRST_THREAD 51
+#define BOOT_TIMING_PAL_START_CONTINUE 52
+#define BOOT_TIMING_PAL_BEFORE_PAL_MAIN 53
+
+static inline void boot_timing_mark(uint8_t event) {
+    vm_portio_writeb(BOOT_TIMING_IO_PORT, event);
+}
+
 int vm_virtualization_exception(struct isr_regs* regs);

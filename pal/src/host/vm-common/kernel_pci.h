@@ -48,13 +48,14 @@
 #define PCI_HEADER_TYPE_MULTI_FUNCTION 0x80
 
 /* PCI_VENDOR_ID / PCI_DEVICE_ID */
-#define PCI_VENDOR_ID_INTEL          0x8086
-#define PCI_DEVICE_ID_INTEL_Q35_MCH  0x29c0
-#define PCI_VENDOR_ID_VIRTIO         0x1af4
-#define PCI_DEVICE_ID_CONSOLE_LEGACY 0x1003
-#define PCI_DEVICE_ID_CONSOLE        0x1043
-#define PCI_DEVICE_ID_VSOCK          0x1053
-#define PCI_DEVICE_ID_FS             0x105a
+#define PCI_VENDOR_ID_INTEL                       0x8086
+#define PCI_DEVICE_ID_INTEL_Q35_MCH               0x29c0
+#define PCI_DEVICE_ID_INTEL_CLOUDHV_HOST_BRIDGE   0x0d57
+#define PCI_VENDOR_ID_VIRTIO                      0x1af4
+#define PCI_DEVICE_ID_CONSOLE_LEGACY              0x1003
+#define PCI_DEVICE_ID_CONSOLE                     0x1043
+#define PCI_DEVICE_ID_VSOCK                       0x1053
+#define PCI_DEVICE_ID_FS                          0x105a
 
 /* VIRTIO_PCI_CAP_CFG_TYPE */
 #define VIRTIO_PCI_CAP_COMMON_CFG        1

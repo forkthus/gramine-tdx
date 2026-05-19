@@ -371,19 +371,26 @@ static int pci_bus_init(void) {
 
 int pci_init(void) {
     uint32_t id = pci_config_readl(/*bdf=*/0, /*addr=*/0);
-    if (id != (PCI_VENDOR_ID_INTEL | (PCI_DEVICE_ID_INTEL_Q35_MCH << 16))) {
-        /* only support Q35 machine type (default in QEMU) */
+    uint16_t vendor_id = id & 0xffff;
+    uint16_t device_id = id >> 16;
+
+    if (vendor_id != PCI_VENDOR_ID_INTEL ||
+            (device_id != PCI_DEVICE_ID_INTEL_Q35_MCH &&
+             device_id != PCI_DEVICE_ID_INTEL_CLOUDHV_HOST_BRIDGE)) {
+        /* only support Q35 and Cloud Hypervisor host bridges */
         return -PAL_ERROR_NOTIMPLEMENTED;
     }
 
-    /*
-     * Top of Low Usable DRAM: bits 15:4 correspond to bits 31:20, and bits 3:0 are reserved.
-     *
-     * NOTE: QEMU seems to ignore the TOLUD register (and always assumes TOLUD = 3GB), but we keep
-     *       the below write for sanity.
-     */
-    uint16_t tolud = PCI_MMIO_START_ADDR >> 16;
-    pci_config_writew(/*bdf=*/0, PCI_TOLUD, tolud);
+    if (device_id == PCI_DEVICE_ID_INTEL_Q35_MCH) {
+        /*
+         * Top of Low Usable DRAM: bits 15:4 correspond to bits 31:20, and bits 3:0 are reserved.
+         *
+         * NOTE: QEMU seems to ignore the TOLUD register (and always assumes TOLUD = 3GB), but we keep
+         *       the below write for sanity.
+         */
+        uint16_t tolud = PCI_MMIO_START_ADDR >> 16;
+        pci_config_writew(/*bdf=*/0, PCI_TOLUD, tolud);
+    }
 
     return pci_bus_init();
 }
