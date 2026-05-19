@@ -1,0 +1,278 @@
+#!/usr/bin/env bash
+# SPDX-License-Identifier: LGPL-3.0-or-later
+# Copyright (C) 2023 Intel Corporation
+
+# This file is based on `gramine-vm.in` and modified for TDX on Cloud Hypervisor.
+#
+# It only replaces the VMM launcher layer. Current Gramine TDX still depends on
+# Cloud Hypervisor support for TD-shim executable payloads and TDX GetQuote.
+
+TDSHIM_PAL_LEGACY_PATH=@TDSHIM_PAL_PATH@
+TDSHIM_PAL_EXEC_PAYLOAD_PATH=@TDSHIM_PAL_EXEC_PAYLOAD_PATH@
+
+if [ -z "${TDSHIM_PAL_PATH:-}" ]; then
+    if [ "${GRAMINE_TDX_EXEC_PAYLOAD_SECTION:-0}" = "1" ]; then
+        TDSHIM_PAL_PATH="$TDSHIM_PAL_EXEC_PAYLOAD_PATH"
+    else
+        TDSHIM_PAL_PATH="$TDSHIM_PAL_LEGACY_PATH"
+    fi
+fi
+
+APPLICATION=
+ENVS=()
+PREFIX=()
+
+if [ "${GDB:-0}" == "1" ]; then
+    echo "Error: GDB=1 is not supported by gramine-tdx-cloud-hypervisor."
+    exit 2
+fi
+
+while [ "$1" != "" ];
+do
+    if [ "$APPLICATION" == "" ]; then
+        APPLICATION=$1
+        shift
+        continue
+    fi
+
+    break
+done
+
+if [ "$APPLICATION" == "" ]; then
+    echo "Usage: $0 [<application>] <args>..."
+    exit 2
+fi
+
+if [ ! -f "$TDSHIM_PAL_PATH" ]; then
+    echo "Error: TD-shim PAL image not found: $TDSHIM_PAL_PATH"
+    exit 2
+fi
+
+DEFAULT_CLOUD_HYPERVISOR_PATH=/home/whji/cloudhypervisor-gramine/cloud-hypervisor/target/release/cloud-hypervisor
+DEFAULT_VIRTIOFSD_PATH=/usr/local/bin/virtiofsd
+
+# Try to get the VM memory config from `.manifest.tdx` file, by parsing `tdx.enclave_size` value.
+# If this fails, try alternatively with `.manifest.sgx` and `sgx.enclave_size`
+#
+# We enforce a 1GB lower limit for VM memory because (a) Gramine VM kernel reserves ~512MB for
+# shared virtio-queues memory, page tables, PAL binary, etc. and (b) for simplicity we want to
+# reuse already-existing SGX manifests, thus we don't want to bump `sgx.enclave_size` to 1GB
+# explicitly.
+export GRAMINE_MANIFEST=$APPLICATION.manifest
+# VM_MEM_SIZE=$(python3 -c "
+# import os
+# import re
+# import sys
+# from graminelibos import Manifest
+
+# manifests = {
+#     'tdx': os.environ['GRAMINE_MANIFEST'] + '.tdx',
+#     'sgx': os.environ['GRAMINE_MANIFEST'] + '.sgx',
+# }
+
+# size_str = ''
+# for type, file in manifests.items():
+#     try:
+#         with open(file, 'rb') as f:
+#             manifest_data = f.read()
+#         manifest = Manifest.loads(manifest_data.decode('utf-8'))
+#         size_str = manifest[type]['enclave_size']
+#         break
+#     except Exception:
+#         continue
+# else:
+#     sys.exit(1)
+
+# unit = 1
+# if size_str.endswith('G'):
+#     unit = 1024 * 1024 * 1024
+# elif size_str.endswith('M'):
+#     unit = 1024 * 1024
+# elif size_str.endswith('K'):
+#     unit = 1024
+
+# try:
+#     size = int(re.search(r'\d+', size_str).group())
+#     print(size_str if unit * size > 1024 * 1024 * 1024 else '1G')
+# except Exception:
+#     sys.exit(1)
+# ")
+# If file parsing fails, then try the config from environment variable `GRAMINE_RAM_SIZE`.
+VM_MEM_SIZE=${VM_MEM_SIZE:-$GRAMINE_RAM_SIZE}
+# If both file and envvar parsing fail, then fall back to the default value of 8GB.
+VM_MEM_SIZE=${VM_MEM_SIZE:-"8G"}
+
+# Try the config from environment variable `GRAMINE_CPU_NUM`, then fall back to default of 1.
+VM_CPU_NUM=${QEMU_CPU_NUM:-$GRAMINE_CPU_NUM}
+VM_CPU_NUM=${VM_CPU_NUM:-"1"}
+
+CLOUD_HYPERVISOR_PATH=${CLOUD_HYPERVISOR_PATH:-$DEFAULT_CLOUD_HYPERVISOR_PATH}
+VIRTIOFSD_PATH=${VIRTIOFSD_PATH:-$DEFAULT_VIRTIOFSD_PATH}
+CH_CONSOLE=${GRAMINE_CLOUD_HYPERVISOR_CONSOLE:-tty}
+CH_SERIAL=${GRAMINE_CLOUD_HYPERVISOR_SERIAL:-off}
+CH_DEBUG_CONSOLE=${GRAMINE_CLOUD_HYPERVISOR_DEBUG_CONSOLE:-off}
+CH_LOG_FILE=${GRAMINE_CLOUD_HYPERVISOR_LOG_FILE:-}
+CH_VERBOSE=${GRAMINE_CLOUD_HYPERVISOR_VERBOSE:-0}
+# Legacy TDX setup on current Cloud Hypervisor still trips the default seccomp
+# profile during early VM initialization. Keep seccomp configurable, but default
+# it off for this launcher so the guest reaches the same state as the QEMU path.
+CH_SECCOMP=${GRAMINE_CLOUD_HYPERVISOR_SECCOMP:-false}
+SKIP_LSOF_CHECK=${GRAMINE_CLOUD_HYPERVISOR_SKIP_LSOF_CHECK:-0}
+
+if [ ! -x "$CLOUD_HYPERVISOR_PATH" ]; then
+    echo "Error: Cloud Hypervisor not found or not executable: $CLOUD_HYPERVISOR_PATH"
+    exit 2
+fi
+
+if [ ! -x "$VIRTIOFSD_PATH" ]; then
+    echo "Error: virtiofsd not found or not executable: $VIRTIOFSD_PATH"
+    exit 2
+fi
+
+# We need to specify a Gramine VM ID to be able to run two independent Gramine instances at the
+# same time on the same machine. They are used as IDs for the virtiofs socket and the vsock CID.
+DEFAULT_GRAMINE_VM_ID=10
+if [ -n "${GRAMINE_VM_ID:-}" ]; then
+    :
+else
+GRAMINE_VM_ID=$(python3 -c "
+import psutil
+import re
+import sys
+
+used_cids = set()
+try:
+    for process in psutil.process_iter(['name', 'cmdline']):
+        name = process.info.get('name') or ''
+        cmdline_list = process.info.get('cmdline') or []
+        cmdline = ' '.join(cmdline_list)
+
+        match = None
+        if 'qemu' in name:
+            match = re.search(r'guest-cid=(\d+)', cmdline)
+        elif 'cloud-hypervisor' in name:
+            match = re.search(r'--vsock(?:\s+|=)[^ ]*\\bcid=(\d+)', cmdline)
+
+        if match:
+            used_cids.add(int(match.group(1)))
+except Exception:
+    sys.exit('Exception while iterating over system processes.')
+
+cid = $DEFAULT_GRAMINE_VM_ID
+while cid in used_cids:
+    cid += 1
+
+if cid > 2 and cid < 0xffffffff:
+    print(cid)
+else:
+    sys.exit('Invalid chosen CID value: ' + str(cid) + '. It must be > 2 and < 0xffffffff.')
+" 2>&1)
+EXIT_STATUS=$?
+
+if [ $EXIT_STATUS -ne 0 ]; then
+    echo "Error: Python script for determining the Gramine-VM ID exited with a non-zero status: $EXIT_STATUS"
+    echo "Error message: $GRAMINE_VM_ID"
+    exit $EXIT_STATUS
+fi
+fi
+
+CH_VIRTIOFS_SOCKET=/tmp/gramine_vhostfs_"$GRAMINE_VM_ID"
+CH_VSOCK_SOCKET=/tmp/gramine_clh_vsock_"$GRAMINE_VM_ID"
+CH_FW_CFG_DIR=$(mktemp -d /tmp/gramine-clh-fwcfg.XXXXXX)
+VIRTIOFSD_PID=
+
+cleanup() {
+    local status=$?
+
+    trap - EXIT INT TERM
+
+    if [ -n "$VIRTIOFSD_PID" ]; then
+        kill "$VIRTIOFSD_PID" 2> /dev/null || true
+        wait "$VIRTIOFSD_PID" 2> /dev/null || true
+    fi
+
+    rm -f "$CH_VSOCK_SOCKET" "$CH_VIRTIOFS_SOCKET" "$CH_VIRTIOFS_SOCKET.pid"
+    rm -rf "$CH_FW_CFG_DIR"
+
+    exit "$status"
+}
+
+trap cleanup EXIT INT TERM
+
+gramine_vars="$(python3 - "$APPLICATION" "$@" <<'PY'
+import os
+import shlex
+import sys
+
+def serialize_item(item):
+    escaped = item.replace('\\', '\\\\').replace('"', '\\"')
+    return f'"{escaped}"'
+
+gramine_args = (
+    '-gramine-args '
+    f"{' '.join(serialize_item(arg) for arg in ['init'] + sys.argv[1:])} "
+    '-gramine-args-end'
+)
+
+gramine_envs = (
+    '-gramine-envs '
+    f"{' '.join(serialize_item(f'{k}={v}') for k, v in os.environ.items())} "
+    '-gramine-envs-end'
+)
+
+print(f"GRAMINE_ARGS={shlex.quote(gramine_args)}")
+print(f"GRAMINE_ENVS={shlex.quote(gramine_envs)}")
+PY
+)"
+EXIT_STATUS=$?
+if [ $EXIT_STATUS -ne 0 ]; then
+    echo "Error: Python script for serializing args/envs exited with status: $EXIT_STATUS"
+    exit $EXIT_STATUS
+fi
+eval "$gramine_vars"
+
+printf '%s' "$PWD" > "$CH_FW_CFG_DIR/pwd"
+printf '%s' "$GRAMINE_ARGS" > "$CH_FW_CFG_DIR/args"
+printf '%s' "$GRAMINE_ENVS" > "$CH_FW_CFG_DIR/envs"
+printf '%s' "$EPOCHSECONDS" > "$CH_FW_CFG_DIR/unixtime_s"
+
+CH_FW_CFG_CONFIG="e820=off,kernel=off,cmdline=off,initramfs=off,acpi_table=off,items=[name=opt/gramine/pwd,file=$CH_FW_CFG_DIR/pwd:name=opt/gramine/args,file=$CH_FW_CFG_DIR/args:name=opt/gramine/envs,file=$CH_FW_CFG_DIR/envs:name=opt/gramine/unixtime_s,file=$CH_FW_CFG_DIR/unixtime_s]"
+
+CMD=("${ENVS[@]}")
+CMD+=("${PREFIX[@]}")
+CMD+=("$CLOUD_HYPERVISOR_PATH"
+      --platform "tdx=on"
+      --cpus "boot=$VM_CPU_NUM,max=$VM_CPU_NUM"
+      --memory "size=$VM_MEM_SIZE,shared=on"
+      --console "$CH_CONSOLE"
+      --serial "$CH_SERIAL"
+      --debug-console "$CH_DEBUG_CONSOLE"
+      --seccomp "$CH_SECCOMP"
+      --firmware "$TDSHIM_PAL_PATH"
+      --fs "tag=graminefs,socket=$CH_VIRTIOFS_SOCKET,num_queues=1,queue_size=1024"
+      --vsock "cid=$GRAMINE_VM_ID,socket=$CH_VSOCK_SOCKET"
+      --fw-cfg-config "$CH_FW_CFG_CONFIG")
+
+if [ -n "$CH_LOG_FILE" ]; then
+    CMD+=(--log-file "$CH_LOG_FILE")
+fi
+
+while [ "$CH_VERBOSE" -gt 0 ]; do
+    CMD+=(-v)
+    CH_VERBOSE=$((CH_VERBOSE - 1))
+done
+
+# Check if the Gramine vhostfs pid file is already in use by another process.
+if [ "$SKIP_LSOF_CHECK" != "1" ] && lsof "$CH_VIRTIOFS_SOCKET".pid 2> /dev/null; then
+    echo "Error: $CH_VIRTIOFS_SOCKET.pid is already in use."
+    exit 2
+fi
+
+rm -f "$CH_VSOCK_SOCKET" "$CH_VIRTIOFS_SOCKET"
+
+"$VIRTIOFSD_PATH" --socket-path "$CH_VIRTIOFS_SOCKET" --shared-dir / --log-level error \
+    --sandbox none --no-announce-submounts &
+VIRTIOFSD_PID=$!
+while [ ! -e "$CH_VIRTIOFS_SOCKET" ]; do sleep 0.1; done
+
+env "${CMD[@]}"

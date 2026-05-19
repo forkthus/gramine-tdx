@@ -77,10 +77,21 @@ if tdx
     conf_gramine_tdx = configuration_data()
     conf_gramine_tdx.merge_from(conf)
     conf_gramine_tdx.set_quoted('TDSHIM_PAL_PATH', join_paths(hostpalpath_tdx, 'tdshim-pal'))
+    conf_gramine_tdx.set_quoted(
+        'TDSHIM_PAL_EXEC_PAYLOAD_PATH',
+        join_paths(hostpalpath_tdx, 'tdshim-pal-exec-payload-section')
+    )
 
     configure_file(
         input: 'gramine-vm.in',
         output: 'gramine-tdx',
+        configuration: conf_gramine_tdx,
+        install_dir: get_option('bindir'),
+    )
+
+    configure_file(
+        input: 'gramine-tdx-cloud-hypervisor.in',
+        output: 'gramine-tdx-cloud-hypervisor',
         configuration: conf_gramine_tdx,
         install_dir: get_option('bindir'),
     )

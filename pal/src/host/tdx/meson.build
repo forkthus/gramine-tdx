@@ -114,10 +114,14 @@ meson.add_install_script('/bin/sh', '-c',
          'echo "Build TD-shim first."; ' +
          'exit 1; ' +
      'fi; ' +
-     'cd "$tdshim" && cargo run -p td-shim-tools --bin td-shim-ld -- ' +
+      'cd "$tdshim" && cargo run -p td-shim-tools --bin td-shim-ld -- ' +
      '"$rv" "$shim" ' +
      '-t executable -p "$MESON_INSTALL_DESTDIR_PREFIX"/@1@/gramine/tdx/pal ' +
-     '-o "$MESON_INSTALL_DESTDIR_PREFIX"/@1@/gramine/tdx/tdshim-pal')
+     '-o "$MESON_INSTALL_DESTDIR_PREFIX"/@1@/gramine/tdx/tdshim-pal && ' +
+     'cd "$tdshim" && cargo run -p td-shim-tools --features exec-payload-section --bin td-shim-ld -- ' +
+     '"$rv" "$shim" ' +
+     '-t executable -p "$MESON_INSTALL_DESTDIR_PREFIX"/@1@/gramine/tdx/pal ' +
+     '-o "$MESON_INSTALL_DESTDIR_PREFIX"/@1@/gramine/tdx/tdshim-pal-exec-payload-section')
      .format(get_option('tdshim_path'), get_option('libdir'))
 )
 
